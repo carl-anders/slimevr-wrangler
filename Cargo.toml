@@ -1,0 +1,27 @@
+[package]
+name = "slimevr-wrangler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+iced = { version = "0.3", features = ["async-std", "svg", "wgpu"] }
+iced_native = "0.4"
+async-std = "1.0"
+joycon-rs = "0.6"
+directories = "4.0"
+self_update = { version = "0.27", features = ["archive-zip"] }
+itertools = "0.10"
+ahrs = "0.4"
+nalgebra = "0.21"
+deku = "0.12"
+md-5 = "0.9"
+
+[profile.release]
+lto = true
+codegen-units = 1
+# panic = "abort" # Doesn't allow threads to catch themselves
+opt-level = "s"
