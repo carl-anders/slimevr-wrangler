@@ -2,6 +2,8 @@
 
 Use joycons (+) as SlimeVR trackers, enabling you to make a full body system with your existing devices. Combine with DIY SlimeVR trackers, or phones using Owotrack.
 
+![Screenshot of the app running and tracking a single Joycon](screenshot.png)
+
 (+) More devices planned to be added.
 
 ## Setup
