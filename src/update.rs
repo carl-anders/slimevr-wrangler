@@ -16,7 +16,7 @@ pub async fn check_updates() -> Option<String> {
     let version = async_std::task::spawn_blocking(|| {
         if let Ok(conf) = update_config() {
             if let Ok(release) = conf.get_latest_release() {
-                match version::bump_is_greater(&cargo_crate_version!(), &release.version) {
+                match version::bump_is_greater(env!("CARGO_PKG_VERSION"), &release.version) {
                     Ok(new_version) if new_version => {
                         return Some(release.version);
                     }

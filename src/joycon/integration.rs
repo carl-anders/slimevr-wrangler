@@ -29,7 +29,6 @@ struct JoyconDeviceInfo {
 
 #[derive(Debug)]
 struct Device {
-    info: JoyconDeviceInfo,
     battery_level: BatteryLevel,
     imu: Imu,
     socket: UdpSocket,
@@ -48,15 +47,15 @@ enum ChannelInfo {
     Connected(JoyconDeviceInfo),
     Data(JoyconData),
 }
-fn serial_number_to_mac(serial: &String) -> [u8; 6] {
+fn serial_number_to_mac(serial: &str) -> [u8; 6] {
     let mut hasher = Md5::new();
     hasher.update(serial);
     hasher.finalize()[0..6].try_into().unwrap()
 }
-fn parse_message(msg: ChannelInfo, devices: &mut HashMap<String, Device>, address: &String) {
+fn parse_message(msg: ChannelInfo, devices: &mut HashMap<String, Device>, address: &str) {
     let address = address
         .parse::<SocketAddr>()
-        .unwrap_or("127.0.0.1:6969".parse().unwrap());
+        .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap());
     match msg {
         ChannelInfo::Connected(device_info) => {
             let serial = device_info.serial_number.clone();
@@ -77,7 +76,6 @@ fn parse_message(msg: ChannelInfo, devices: &mut HashMap<String, Device>, addres
             devices.insert(
                 serial,
                 Device {
-                    info: device_info.clone(),
                     design: JoyconDesign {
                         colour: device_info.color.body,
                         design_type: device_info.device_type,
@@ -95,7 +93,7 @@ fn parse_message(msg: ChannelInfo, devices: &mut HashMap<String, Device>, addres
 
                 let rotation = PacketType::Rotation {
                     packet_id: 1,
-                    quat: (*device.imu.rotation.clone()).into(),
+                    quat: (*device.imu.rotation).into(),
                 };
 
                 device
@@ -179,7 +177,7 @@ fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
         let joycon = driver.joycon();
         let info = JoyconDeviceInfo {
             serial_number: joycon.serial_number().to_owned(),
-            device_type: joycon.device_type().clone(),
+            device_type: joycon.device_type(),
             color: joycon.color().clone(),
         };
         drop(joycon);
@@ -198,7 +196,7 @@ fn startup(address: String) -> mpsc::Receiver<Vec<JoyconStatus>> {
     let (tx, rx) = mpsc::channel();
     let _ = std::thread::spawn(move || main_thread(rx, out_tx, address));
     std::thread::spawn(move || spawn_thread(tx));
-    return out_rx;
+    out_rx
 }
 
 pub struct JoyconIntegration {

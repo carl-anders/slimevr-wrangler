@@ -44,7 +44,7 @@ impl Imu {
             let acc = Vector3::new(acc(frame.accel_x), acc(frame.accel_y), acc(frame.accel_z));
             let rot = self.mad.update_imu(&gyro, &acc);
             match rot {
-                Ok(r) => self.rotation = r.clone(),
+                Ok(r) => self.rotation = *r,
                 Err(e) => {
                     println!("Found IMU Frame with error: (Ignore this if it happens only once or twice)");
                     println!("{:?}", frame);

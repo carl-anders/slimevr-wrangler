@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 fn file_name() -> Option<PathBuf> {
     ProjectDirs::from("", "", "SlimeVR Wrangler")
-        .and_then(|pd| Some(pd.config_dir().join("config.json")))
+        .map(|pd| pd.config_dir().join("config.json"))
 }
 #[derive(Serialize, Deserialize, Default)]
 pub struct WranglerSettings {

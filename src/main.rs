@@ -125,12 +125,13 @@ impl Application for MainState {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let mut subs: Vec<Subscription<Message>> = Vec::new();
-        subs.push(iced_native::subscription::events().map(Message::EventOccurred));
+        let mut subs: Vec<Subscription<Message>> = vec![
+            iced_native::subscription::events().map(Message::EventOccurred),
+            time::every(Duration::from_millis(500)).map(Message::Dot)
+        ];
         if self.joycon.is_some() {
             subs.push(time::every(Duration::from_millis(100)).map(Message::Tick));
         }
-        subs.push(time::every(Duration::from_millis(500)).map(Message::Dot));
         Subscription::batch(subs)
     }
 
@@ -238,12 +239,12 @@ fn float_list<'a>(
     }
     list
 }
-fn address<'a>(input: &'a mut text_input::State, input_value: &String) -> Column<'a, Message> {
+fn address<'a>(input: &'a mut text_input::State, input_value: &str) -> Column<'a, Message> {
     let adress_info = Text::new("Enter a valid ip with port number:");
     let adress = TextInput::new(
         input,
         "127.0.0.1:6969",
-        &input_value,
+        input_value,
         Message::AddressChanged,
     )
     .width(Length::Units(500))
