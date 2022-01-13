@@ -1,177 +1,22 @@
-use crate::slime::deku::PacketType;
-
-use super::imu::{Imu, JoyconAxisData};
+use super::communication::{ChannelInfo, JoyconData, JoyconDeviceInfo};
+use super::imu::JoyconAxisData;
 use super::{JoyconDesign, JoyconDesignType};
-use deku::DekuContainerWrite;
 use joycon::joycon_sys::spi::ControllerColor;
 use joycon::{
     hidapi::HidApi,
     joycon_sys::{light, HID_IDS, NINTENDO_VENDOR_ID},
-    JoyCon, IMU,
+    JoyCon,
 };
-use md5::{Digest, Md5};
-use std::collections::{HashMap, HashSet};
-use std::net::{SocketAddr, UdpSocket};
+use std::collections::HashSet;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-#[derive(Debug, Clone)]
-pub struct JoyconStatus {
-    pub connected: bool,
-    pub rotation: (f64, f64, f64),
-    pub design: JoyconDesign,
-}
-
-#[derive(Debug, Clone)]
-struct JoyconDeviceInfo {
-    serial_number: String,
-    design: JoyconDesign,
-}
-
-#[derive(Debug)]
-struct Device {
-    imu: Imu,
-    socket: UdpSocket,
-    design: JoyconDesign,
-}
-
-#[derive(Debug, Clone)]
-struct JoyconData {
-    serial_number: String,
-    imu_data: [IMU; 3],
-}
-
-#[derive(Debug, Clone)]
-enum ChannelInfo {
-    Connected(JoyconDeviceInfo),
-    Data(JoyconData),
-}
-fn serial_number_to_mac(serial: &str) -> [u8; 6] {
-    let mut hasher = Md5::new();
-    hasher.update(serial);
-    hasher.finalize()[0..6].try_into().unwrap()
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct JoyconAxisDataRawFloat {
-    pub accel_x: f64,
-    pub accel_y: f64,
-    pub accel_z: f64,
-    pub gyro_x: f64,
-    pub gyro_y: f64,
-    pub gyro_z: f64,
-}
-
-fn acc_f(n: f64) -> f64 {
+fn acc(n: f64) -> f64 {
     n * 9.82
 }
-fn gyro_f(n: f64) -> f64 {
+fn gyro(n: f64) -> f64 {
     n * (std::f64::consts::PI / 180.0f64) // deg/s to rad/s
-}
-impl From<JoyconAxisDataRawFloat> for JoyconAxisData {
-    fn from(item: JoyconAxisDataRawFloat) -> Self {
-        Self {
-            accel_x: acc_f(item.accel_x),
-            accel_y: acc_f(item.accel_y),
-            accel_z: acc_f(item.accel_z),
-            gyro_x: gyro_f(item.gyro_x),
-            gyro_y: gyro_f(item.gyro_y),
-            gyro_z: gyro_f(item.gyro_z),
-        }
-    }
-}
-
-fn parse_message(msg: ChannelInfo, devices: &mut HashMap<String, Device>, address: &str) {
-    let address = address
-        .parse::<SocketAddr>()
-        .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap());
-    match msg {
-        ChannelInfo::Connected(device_info) => {
-            let serial = device_info.serial_number.clone();
-            let handshake = PacketType::Handshake {
-                packet_id: 1,
-                board: 0,
-                imu: 0,
-                mcu_type: 0,
-                imu_info: (0, 0, 0),
-                build: 0,
-                firmware: "slimevr-wrangler".to_string().into(),
-                mac_address: serial_number_to_mac(&serial),
-            };
-            let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-            socket
-                .send_to(&handshake.to_bytes().unwrap(), address)
-                .unwrap();
-            devices.insert(
-                serial,
-                Device {
-                    design: device_info.design,
-                    imu: Imu::new(),
-                    socket,
-                },
-            );
-        }
-        ChannelInfo::Data(data) => match devices.get_mut(&data.serial_number) {
-            Some(device) => {
-                for frame in data.imu_data {
-                    device.imu.update(JoyconAxisDataRawFloat {
-                        accel_x: frame.accel.x,
-                        accel_y: frame.accel.y,
-                        accel_z: frame.accel.z,
-                        gyro_x: frame.gyro.x,
-                        gyro_y: frame.gyro.y,
-                        gyro_z: frame.gyro.z,
-                    }.into())
-                }
-
-                let rotation = PacketType::Rotation {
-                    packet_id: 1,
-                    quat: (*device.imu.rotation).into(),
-                };
-
-                device
-                    .socket
-                    .send_to(&rotation.to_bytes().unwrap(), address)
-                    .unwrap();
-            }
-            None => (),
-        },
-    }
-}
-
-fn main_thread(
-    receive: mpsc::Receiver<ChannelInfo>,
-    output_tx: mpsc::Sender<Vec<JoyconStatus>>,
-    address: String,
-) {
-    let mut devices = HashMap::new();
-    loop {
-        let mut got_message = false;
-        for _ in 0..2 {
-            for msg in receive.try_iter() {
-                got_message = true;
-                parse_message(msg, &mut devices, &address);
-            }
-            if got_message {
-                break;
-            } else {
-                thread::sleep(Duration::from_millis(2));
-            }
-        }
-
-        if got_message {
-            let mut statuses = Vec::new();
-            for device in devices.values() {
-                statuses.push(JoyconStatus {
-                    connected: true,
-                    rotation: device.imu.euler_angles_deg(),
-                    design: device.design.clone(),
-                });
-            }
-            let _ = output_tx.send(statuses);
-        }
-    }
 }
 
 fn joycon_thread(sn: String, mut joycon: JoyCon, tx: mpsc::Sender<ChannelInfo>) {
@@ -179,6 +24,21 @@ fn joycon_thread(sn: String, mut joycon: JoyCon, tx: mpsc::Sender<ChannelInfo>) 
         match joycon.tick() {
             Ok(report) => match report.imu {
                 Some(imu_data) => {
+                    let imu_data = imu_data
+                        .iter()
+                        .map(|frame| JoyconAxisData {
+                            accel_x: acc(frame.accel.x),
+                            accel_y: acc(frame.accel.y),
+                            accel_z: acc(frame.accel.z),
+                            gyro_x: gyro(frame.gyro.x),
+                            gyro_y: gyro(frame.gyro.y),
+                            gyro_z: gyro(frame.gyro.z),
+                        })
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                        .try_into()
+                        .unwrap();
+
                     tx.send(ChannelInfo::Data(JoyconData {
                         serial_number: sn.clone(),
                         imu_data,
@@ -196,7 +56,7 @@ fn joycon_thread(sn: String, mut joycon: JoyCon, tx: mpsc::Sender<ChannelInfo>) 
     }
 }
 
-fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
+pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
     let mut api = HidApi::new().unwrap();
     let mut connected_controllers: HashSet<String> = HashSet::new();
     loop {
@@ -284,27 +144,5 @@ fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
             tx.send(ChannelInfo::Connected(info)).unwrap();
             std::thread::spawn(move || joycon_thread(sn, joycon, tx));
         }
-    }
-}
-
-fn startup(address: String) -> mpsc::Receiver<Vec<JoyconStatus>> {
-    let (out_tx, out_rx) = mpsc::channel();
-    let (tx, rx) = mpsc::channel();
-    let _ = std::thread::spawn(move || main_thread(rx, out_tx, address));
-    std::thread::spawn(move || spawn_thread(tx));
-    out_rx
-}
-
-pub struct JoyconIntegration {
-    rx: mpsc::Receiver<Vec<JoyconStatus>>,
-}
-impl JoyconIntegration {
-    pub fn new(address: String) -> Self {
-        Self {
-            rx: startup(address),
-        }
-    }
-    pub fn poll(&self) -> Option<Vec<JoyconStatus>> {
-        self.rx.try_iter().last()
     }
 }

@@ -1,21 +1,6 @@
 use ahrs::{Ahrs, Madgwick};
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
-// Gyro: 2000dps
-// Accel: 8G
-// https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/imu_sensor_notes.md
-
-// Convert to acceleration in G
-fn acc(n: i16) -> f64 {
-    n as f64 * 0.00024414435f64 // 16000/65535/1000
-}
-// Convert to acceleration in radians/s
-// TODO: add option for different numbers - or find the right magic
-fn gyro(n: i16) -> f64 {
-    n as f64
-    * 0.07000839246f64 // 4588/65535 - degrees/s
-    * (std::f64::consts::PI / 180.0f64) // radians/s
-}
 
 fn deg(r: f64) -> f64 {
     r * (180.0f64 / std::f64::consts::PI)
@@ -29,29 +14,6 @@ pub struct JoyconAxisData {
     pub gyro_x: f64,
     pub gyro_y: f64,
     pub gyro_z: f64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct JoyconAxisDataRaw {
-    pub accel_x: i16,
-    pub accel_y: i16,
-    pub accel_z: i16,
-    pub gyro_x: i16,
-    pub gyro_y: i16,
-    pub gyro_z: i16,
-}
-
-impl From<JoyconAxisDataRaw> for JoyconAxisData {
-    fn from(item: JoyconAxisDataRaw) -> Self {
-        Self {
-            accel_x: acc(item.accel_x),
-            accel_y: acc(item.accel_y),
-            accel_z: acc(item.accel_z),
-            gyro_x: gyro(item.gyro_x),
-            gyro_y: gyro(item.gyro_y),
-            gyro_z: gyro(item.gyro_z),
-        }
-    }
 }
 
 #[derive(Debug)]

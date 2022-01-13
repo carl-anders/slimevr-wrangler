@@ -1,159 +1,22 @@
-use crate::slime::deku::PacketType;
-
-use super::imu::{Imu, JoyconAxisDataRaw};
-use super::{JoyconDesign, JoyconDesignType};
-use deku::DekuContainerWrite;
-use joycon_rs::joycon::input_report_mode::standard_full_mode::IMUData;
-use joycon_rs::joycon::input_report_mode::BatteryLevel;
+use super::imu::JoyconAxisData;
+use super::{ChannelInfo, JoyconData, JoyconDesign, JoyconDesignType, JoyconDeviceInfo};
 use joycon_rs::prelude::*;
-use md5::{Digest, Md5};
-use std::collections::HashMap;
-use std::net::{SocketAddr, UdpSocket};
 use std::sync::mpsc;
-use std::thread;
-use std::time::Duration;
 
-#[derive(Debug, Clone)]
-pub struct JoyconStatus {
-    pub connected: bool,
-    pub rotation: (f64, f64, f64),
-    pub design: JoyconDesign,
+// Gyro: 2000dps
+// Accel: 8G
+// https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/imu_sensor_notes.md
+
+// Convert to acceleration in G
+fn acc(n: i16) -> f64 {
+    n as f64 * 0.00024414435f64 // 16000/65535/1000
 }
-
-#[derive(Debug, Clone)]
-struct JoyconDeviceInfo {
-    serial_number: String,
-    device_type: JoyConDeviceType,
-    color: device::color::Color,
-}
-
-#[derive(Debug)]
-struct Device {
-    battery_level: BatteryLevel,
-    imu: Imu,
-    socket: UdpSocket,
-    design: JoyconDesign,
-}
-
-#[derive(Debug, Clone)]
-struct JoyconData {
-    serial_number: String,
-    battery_level: BatteryLevel,
-    axis_data: IMUData,
-}
-
-#[derive(Debug, Clone)]
-enum ChannelInfo {
-    Connected(JoyconDeviceInfo),
-    Data(JoyconData),
-}
-fn serial_number_to_mac(serial: &str) -> [u8; 6] {
-    let mut hasher = Md5::new();
-    hasher.update(serial);
-    hasher.finalize()[0..6].try_into().unwrap()
-}
-fn parse_message(msg: ChannelInfo, devices: &mut HashMap<String, Device>, address: &str) {
-    let address = address
-        .parse::<SocketAddr>()
-        .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap());
-    match msg {
-        ChannelInfo::Connected(device_info) => {
-            let serial = device_info.serial_number.clone();
-            let handshake = PacketType::Handshake {
-                packet_id: 1,
-                board: 0,
-                imu: 0,
-                mcu_type: 0,
-                imu_info: (0, 0, 0),
-                build: 0,
-                firmware: "slimevr-wrangler".to_string().into(),
-                mac_address: serial_number_to_mac(&serial),
-            };
-            let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-            socket
-                .send_to(&handshake.to_bytes().unwrap(), address)
-                .unwrap();
-            devices.insert(
-                serial,
-                Device {
-                    design: JoyconDesign {
-                        color: format!(
-                            "#{:02x}{:02x}{:02x}",
-                            device_info.color.body[0], device_info.color.body[1], device_info.color.body[2]
-                        ),
-                        design_type: match device_info.device_type {
-                            JoyConDeviceType::JoyConL => JoyconDesignType::LEFT,
-                            JoyConDeviceType::JoyConR => JoyconDesignType::RIGHT,
-                            JoyConDeviceType::ProCon => JoyconDesignType::LEFT,
-                        },
-                    },
-                    battery_level: BatteryLevel::Empty,
-                    imu: Imu::new(),
-                    socket,
-                },
-            );
-        }
-        ChannelInfo::Data(data) => match devices.get_mut(&data.serial_number) {
-            Some(device) => {
-                for frame in data.axis_data.data {
-                    device.imu.update(JoyconAxisDataRaw {
-                        accel_x: frame.accel_x,
-                        accel_y: frame.accel_y,
-                        accel_z: frame.accel_z,
-                        gyro_x: frame.gyro_1,
-                        gyro_y: frame.gyro_2,
-                        gyro_z: frame.gyro_3,
-                    }.into())
-                }
-                device.battery_level = data.battery_level;
-
-                let rotation = PacketType::Rotation {
-                    packet_id: 1,
-                    quat: (*device.imu.rotation).into(),
-                };
-
-                device
-                    .socket
-                    .send_to(&rotation.to_bytes().unwrap(), address)
-                    .unwrap();
-            }
-            None => (),
-        },
-    }
-}
-
-fn main_thread(
-    receive: mpsc::Receiver<ChannelInfo>,
-    output_tx: mpsc::Sender<Vec<JoyconStatus>>,
-    address: String,
-) {
-    let mut devices = HashMap::new();
-    loop {
-        let mut got_message = false;
-        for _ in 0..2 {
-            for msg in receive.try_iter() {
-                got_message = true;
-                parse_message(msg, &mut devices, &address);
-            }
-            if got_message {
-                break;
-            } else {
-                thread::sleep(Duration::from_millis(2));
-            }
-        }
-
-        if got_message {
-            let mut statuses = Vec::new();
-            for device in devices.values() {
-                statuses.push(JoyconStatus {
-                    connected: true,
-                    rotation: device.imu.euler_angles_deg(),
-                    design: device.design.clone(),
-                });
-            }
-            let _ = output_tx.send(statuses);
-        }
-    }
+// Convert to acceleration in radians/s
+// TODO: add option for different numbers - or find the right magic
+fn gyro(n: i16) -> f64 {
+    n as f64
+    * 0.07000839246f64 // 4588/65535 - degrees/s
+    * (std::f64::consts::PI / 180.0f64) // radians/s
 }
 
 fn joycon_thread(standard: StandardFullMode<SimpleJoyConDriver>, tx: mpsc::Sender<ChannelInfo>) {
@@ -162,10 +25,26 @@ fn joycon_thread(standard: StandardFullMode<SimpleJoyConDriver>, tx: mpsc::Sende
         match standard.read_input_report() {
             Ok(report) => {
                 if report.common.input_report_id == 48 {
+                    let imu_data = report
+                        .extra
+                        .data
+                        .iter()
+                        .map(|data| JoyconAxisData {
+                            accel_x: acc(data.accel_x),
+                            accel_y: acc(data.accel_y),
+                            accel_z: acc(data.accel_z),
+                            gyro_x: gyro(data.gyro_1),
+                            gyro_y: gyro(data.gyro_2),
+                            gyro_z: gyro(data.gyro_3),
+                        })
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                        .try_into()
+                        .unwrap();
                     let data = JoyconData {
                         serial_number: sn.clone(),
-                        battery_level: report.common.battery.level,
-                        axis_data: report.extra,
+                        //battery_level: report.common.battery.level,
+                        imu_data,
                     };
                     tx.send(ChannelInfo::Data(data)).unwrap();
                 }
@@ -179,7 +58,7 @@ fn joycon_thread(standard: StandardFullMode<SimpleJoyConDriver>, tx: mpsc::Sende
     }
 }
 
-fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
+pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
     let manager = JoyConManager::get_instance();
     let devices = {
         let lock = manager.lock();
@@ -191,10 +70,20 @@ fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
     let _ = devices.iter().try_for_each::<_, JoyConResult<()>>(|d| {
         let driver = SimpleJoyConDriver::new(&d)?;
         let joycon = driver.joycon();
+        let color = joycon.color().clone();
         let info = JoyconDeviceInfo {
             serial_number: joycon.serial_number().to_owned(),
-            device_type: joycon.device_type(),
-            color: joycon.color().clone(),
+            design: JoyconDesign {
+                color: format!(
+                    "#{:02x}{:02x}{:02x}",
+                    color.body[0], color.body[1], color.body[2]
+                ),
+                design_type: match joycon.device_type() {
+                    JoyConDeviceType::JoyConL => JoyconDesignType::LEFT,
+                    JoyConDeviceType::JoyConR => JoyconDesignType::RIGHT,
+                    JoyConDeviceType::ProCon => JoyconDesignType::LEFT,
+                },
+            },
         };
         drop(joycon);
         let tx = tx.clone();
@@ -205,26 +94,4 @@ fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
 
         Ok(())
     });
-}
-
-fn startup(address: String) -> mpsc::Receiver<Vec<JoyconStatus>> {
-    let (out_tx, out_rx) = mpsc::channel();
-    let (tx, rx) = mpsc::channel();
-    let _ = std::thread::spawn(move || main_thread(rx, out_tx, address));
-    std::thread::spawn(move || spawn_thread(tx));
-    out_rx
-}
-
-pub struct JoyconIntegration {
-    rx: mpsc::Receiver<Vec<JoyconStatus>>,
-}
-impl JoyconIntegration {
-    pub fn new(address: String) -> Self {
-        Self {
-            rx: startup(address),
-        }
-    }
-    pub fn poll(&self) -> Option<Vec<JoyconStatus>> {
-        self.rx.try_iter().last()
-    }
 }
