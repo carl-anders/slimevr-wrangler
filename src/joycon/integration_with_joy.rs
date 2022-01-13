@@ -134,9 +134,9 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
                 design: JoyconDesign {
                     color: body_color,
                     design_type: if joycon.supports_ir() {
-                        JoyconDesignType::RIGHT
+                        JoyconDesignType::Right
                     } else {
-                        JoyconDesignType::LEFT
+                        JoyconDesignType::Left
                     },
                 },
             };

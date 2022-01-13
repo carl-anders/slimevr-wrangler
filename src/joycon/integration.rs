@@ -79,9 +79,9 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
                     color.body[0], color.body[1], color.body[2]
                 ),
                 design_type: match joycon.device_type() {
-                    JoyConDeviceType::JoyConL => JoyconDesignType::LEFT,
-                    JoyConDeviceType::JoyConR => JoyconDesignType::RIGHT,
-                    JoyConDeviceType::ProCon => JoyconDesignType::LEFT,
+                    JoyConDeviceType::JoyConL => JoyconDesignType::Left,
+                    JoyConDeviceType::JoyConR => JoyconDesignType::Right,
+                    JoyConDeviceType::ProCon => JoyconDesignType::Left,
                 },
             },
         };

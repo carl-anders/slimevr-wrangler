@@ -7,8 +7,8 @@ static RIGHT: &str = include_str!("../../assets/joycon-right.svg");
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum JoyconDesignType {
-    LEFT,
-    RIGHT
+    Left,
+    Right
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -35,8 +35,8 @@ impl JoyconSvg {
             Occupied(entry) => entry.into_mut(),
             Vacant(entry) => {
                 let svg_code = match design.design_type {
-                    JoyconDesignType::LEFT => LEFT.replace("#3fa9f5", &design.color),
-                    JoyconDesignType::RIGHT => RIGHT.replace("#ff1d25", &design.color)
+                    JoyconDesignType::Left => LEFT.replace("#3fa9f5", &design.color),
+                    JoyconDesignType::Right => RIGHT.replace("#ff1d25", &design.color)
                 };
 
                 entry.insert(Svg::new(Handle::from_memory(svg_code)))
