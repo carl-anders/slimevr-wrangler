@@ -11,7 +11,8 @@ serde_json = "1.0"
 iced = { version = "0.3", features = ["async-std", "svg", "wgpu"] }
 iced_native = "0.4"
 async-std = "1.0"
-joycon-rs = "0.6"
+joycon-rs = { version = "0.6", optional = true }
+joycon = { git = "https://github.com/Yamakaky/joy", optional = true }
 directories = "4.0"
 self_update = { version = "0.27", features = ["archive-zip", "compression-zip-deflate"] }
 itertools = "0.10"
@@ -19,6 +20,11 @@ ahrs = "0.4"
 nalgebra = "0.21"
 deku = "0.12"
 md-5 = "0.9"
+
+[features]
+default = ["use-joycon-rs"]
+use-joycon-rs = ["joycon-rs"]
+use-joy = ["joycon"]
 
 [profile.release]
 lto = true

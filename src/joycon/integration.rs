@@ -1,6 +1,6 @@
 use crate::slime::deku::PacketType;
 
-use super::imu::{Imu, JoyconAxisData};
+use super::imu::{Imu, JoyconAxisDataRaw};
 use super::{JoyconDesign, JoyconDesignType};
 use deku::DekuContainerWrite;
 use joycon_rs::joycon::input_report_mode::standard_full_mode::IMUData;
@@ -77,7 +77,10 @@ fn parse_message(msg: ChannelInfo, devices: &mut HashMap<String, Device>, addres
                 serial,
                 Device {
                     design: JoyconDesign {
-                        colour: device_info.color.body,
+                        color: format!(
+                            "#{:02x}{:02x}{:02x}",
+                            device_info.color.body[0], device_info.color.body[1], device_info.color.body[2]
+                        ),
                         design_type: match device_info.device_type {
                             JoyConDeviceType::JoyConL => JoyconDesignType::LEFT,
                             JoyConDeviceType::JoyConR => JoyconDesignType::RIGHT,
@@ -93,14 +96,14 @@ fn parse_message(msg: ChannelInfo, devices: &mut HashMap<String, Device>, addres
         ChannelInfo::Data(data) => match devices.get_mut(&data.serial_number) {
             Some(device) => {
                 for frame in data.axis_data.data {
-                    device.imu.update(JoyconAxisData {
+                    device.imu.update(JoyconAxisDataRaw {
                         accel_x: frame.accel_x,
                         accel_y: frame.accel_y,
                         accel_z: frame.accel_z,
                         gyro_x: frame.gyro_1,
                         gyro_y: frame.gyro_2,
                         gyro_z: frame.gyro_3,
-                    })
+                    }.into())
                 }
                 device.battery_level = data.battery_level;
 

@@ -13,16 +13,8 @@ pub enum JoyconDesignType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JoyconDesign {
-    pub colour: [u8; 3],
+    pub color: String,
     pub design_type: JoyconDesignType,
-}
-impl JoyconDesign {
-    pub fn hex(&self) -> String {
-        format!(
-            "{:02x}{:02x}{:02x}",
-            self.colour[0], self.colour[1], self.colour[2]
-        )
-    }
 }
 pub struct JoyconSvg {
     map: HashMap<JoyconDesign, Svg>,
@@ -43,8 +35,8 @@ impl JoyconSvg {
             Occupied(entry) => entry.into_mut(),
             Vacant(entry) => {
                 let svg_code = match design.design_type {
-                    JoyconDesignType::LEFT => LEFT.replace("3fa9f5", &design.hex()),
-                    JoyconDesignType::RIGHT => RIGHT.replace("ff1d25", &design.hex())
+                    JoyconDesignType::LEFT => LEFT.replace("#3fa9f5", &design.color),
+                    JoyconDesignType::RIGHT => RIGHT.replace("#ff1d25", &design.color)
                 };
 
                 entry.insert(Svg::new(Handle::from_memory(svg_code)))

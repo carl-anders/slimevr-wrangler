@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 mod joycon;
-use joycon::{JoyconIntegration, JoyconStatus, JoyconSvg};
+use crate::joycon::{JoyconIntegration, JoyconStatus, JoyconSvg};
 mod settings;
 mod slime;
 mod style;

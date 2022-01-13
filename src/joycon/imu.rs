@@ -23,12 +23,35 @@ fn deg(r: f64) -> f64 {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JoyconAxisData {
+    pub accel_x: f64,
+    pub accel_y: f64,
+    pub accel_z: f64,
+    pub gyro_x: f64,
+    pub gyro_y: f64,
+    pub gyro_z: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct JoyconAxisDataRaw {
     pub accel_x: i16,
     pub accel_y: i16,
     pub accel_z: i16,
     pub gyro_x: i16,
     pub gyro_y: i16,
     pub gyro_z: i16,
+}
+
+impl From<JoyconAxisDataRaw> for JoyconAxisData {
+    fn from(item: JoyconAxisDataRaw) -> Self {
+        Self {
+            accel_x: acc(item.accel_x),
+            accel_y: acc(item.accel_y),
+            accel_z: acc(item.accel_z),
+            gyro_x: gyro(item.gyro_x),
+            gyro_y: gyro(item.gyro_y),
+            gyro_z: gyro(item.gyro_z),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -48,13 +71,15 @@ impl Imu {
         }
     }
     pub fn update(&mut self, frame: JoyconAxisData) {
-        let gyro = Vector3::new(gyro(frame.gyro_x), gyro(frame.gyro_y), gyro(frame.gyro_z));
-        let acc = Vector3::new(acc(frame.accel_x), acc(frame.accel_y), acc(frame.accel_z));
+        let gyro = Vector3::new(frame.gyro_x, frame.gyro_y, frame.gyro_z);
+        let acc = Vector3::new(frame.accel_x, frame.accel_y, frame.accel_z);
         let rot = self.mad.update_imu(&gyro, &acc);
         match rot {
             Ok(r) => self.rotation = *r,
             Err(e) => {
-                println!("Found IMU Frame with error: (Ignore this if it happens only once or twice)");
+                println!(
+                    "Found IMU Frame with error: (Ignore this if it happens only once or twice)"
+                );
                 println!("{:?}", frame);
                 println!("{}", gyro);
                 println!("{}", acc);
