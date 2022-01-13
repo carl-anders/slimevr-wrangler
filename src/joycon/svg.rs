@@ -1,5 +1,4 @@
 use iced::{svg::Handle, Svg};
-use joycon_rs::joycon::JoyConDeviceType;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
 
@@ -7,9 +6,15 @@ static LEFT: &str = include_str!("../../assets/joycon-left.svg");
 static RIGHT: &str = include_str!("../../assets/joycon-right.svg");
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum JoyconDesignType {
+    LEFT,
+    RIGHT
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JoyconDesign {
     pub colour: [u8; 3],
-    pub design_type: JoyConDeviceType,
+    pub design_type: JoyconDesignType,
 }
 impl JoyconDesign {
     pub fn hex(&self) -> String {
@@ -38,10 +43,8 @@ impl JoyconSvg {
             Occupied(entry) => entry.into_mut(),
             Vacant(entry) => {
                 let svg_code = match design.design_type {
-                    JoyConDeviceType::JoyConL => LEFT.replace("3fa9f5", &design.hex()),
-                    JoyConDeviceType::JoyConR | JoyConDeviceType::ProCon => {
-                        RIGHT.replace("ff1d25", &design.hex())
-                    }
+                    JoyconDesignType::LEFT => LEFT.replace("3fa9f5", &design.hex()),
+                    JoyconDesignType::RIGHT => RIGHT.replace("ff1d25", &design.hex())
                 };
 
                 entry.insert(Svg::new(Handle::from_memory(svg_code)))

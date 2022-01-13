@@ -1,5 +1,4 @@
 use ahrs::{Ahrs, Madgwick};
-use joycon_rs::joycon::input_report_mode::standard_full_mode::IMUData;
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
 // Gyro: 2000dps
@@ -22,6 +21,16 @@ fn deg(r: f64) -> f64 {
     r * (180.0f64 / std::f64::consts::PI)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct JoyconAxisData {
+    pub accel_x: i16,
+    pub accel_y: i16,
+    pub accel_z: i16,
+    pub gyro_x: i16,
+    pub gyro_y: i16,
+    pub gyro_z: i16,
+}
+
 #[derive(Debug)]
 pub struct Imu {
     mad: Madgwick<f64>,
@@ -38,20 +47,18 @@ impl Imu {
             )),
         }
     }
-    pub fn update(&mut self, imu_data: IMUData) {
-        for frame in imu_data.data {
-            let gyro = Vector3::new(gyro(frame.gyro_1), gyro(frame.gyro_2), gyro(frame.gyro_3));
-            let acc = Vector3::new(acc(frame.accel_x), acc(frame.accel_y), acc(frame.accel_z));
-            let rot = self.mad.update_imu(&gyro, &acc);
-            match rot {
-                Ok(r) => self.rotation = *r,
-                Err(e) => {
-                    println!("Found IMU Frame with error: (Ignore this if it happens only once or twice)");
-                    println!("{:?}", frame);
-                    println!("{}", gyro);
-                    println!("{}", acc);
-                    println!("{}", e);
-                }
+    pub fn update(&mut self, frame: JoyconAxisData) {
+        let gyro = Vector3::new(gyro(frame.gyro_x), gyro(frame.gyro_y), gyro(frame.gyro_z));
+        let acc = Vector3::new(acc(frame.accel_x), acc(frame.accel_y), acc(frame.accel_z));
+        let rot = self.mad.update_imu(&gyro, &acc);
+        match rot {
+            Ok(r) => self.rotation = *r,
+            Err(e) => {
+                println!("Found IMU Frame with error: (Ignore this if it happens only once or twice)");
+                println!("{:?}", frame);
+                println!("{}", gyro);
+                println!("{}", acc);
+                println!("{}", e);
             }
         }
     }
