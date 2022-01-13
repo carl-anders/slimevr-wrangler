@@ -13,7 +13,7 @@ iced_native = "0.4"
 async-std = "1.0"
 joycon-rs = "0.6"
 directories = "4.0"
-self_update = { version = "0.27", features = ["archive-zip"] }
+self_update = { version = "0.27", features = ["archive-zip", "compression-zip-deflate"] }
 itertools = "0.10"
 ahrs = "0.4"
 nalgebra = "0.21"
