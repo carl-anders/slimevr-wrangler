@@ -71,4 +71,18 @@ pub enum PacketType {
         firmware: SlimeString,
         mac_address: [u8; 6],
     },
+    #[deku(id = "15")]
+    SensorInfo {
+        packet_id: u64,
+        sensor_id: u8,
+        sensor_status: u8,
+    },
+    #[deku(id = "17")]
+    RotationData {
+        packet_id: u64,
+        sensor_id: u8,
+        data_type: u8,
+        quat: SlimeQuaternion,
+        calibration_info: u8,
+    },
 }

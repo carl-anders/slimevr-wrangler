@@ -41,4 +41,34 @@ mod tests {
 
         assert_eq!(rotation.to_bytes().unwrap(), data);
     }
+    #[test]
+    fn sensor_info() {
+        let sensor_info = PacketType::SensorInfo {
+            packet_id: 1,
+            sensor_id: 64,
+            sensor_status: 1,
+        };
+
+        let data: Vec<u8> = vec![0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 1, 64, 1];
+
+        assert_eq!(sensor_info.to_bytes().unwrap(), data);
+    }
+    #[test]
+    fn quat_fancy() {
+        let quat = UnitQuaternion::new_unchecked(Quaternion::new(1.0f64, 0.0f64, 0.0f64, 0.0f64));
+        let rotation = PacketType::RotationData {
+            packet_id: 1,
+            sensor_id: 64,
+            data_type: 1,
+            quat: (*quat.quaternion()).into(),
+            calibration_info: 0,
+        };
+
+        let data: Vec<u8> = vec![
+            0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 1, 64, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63,
+            128, 0, 0, 0,
+        ];
+
+        assert_eq!(rotation.to_bytes().unwrap(), data);
+    }
 }
