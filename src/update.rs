@@ -8,6 +8,7 @@ fn update_config() -> Result<Box<dyn ReleaseUpdate>, Error> {
         .repo_name("slimevr-wrangler")
         .bin_name("slimevr-wrangler")
         .show_download_progress(true)
+        .show_output(true)
         .current_version(cargo_crate_version!())
         .no_confirm(true)
         .build()
@@ -33,7 +34,7 @@ pub fn update() {
     if let Ok(conf) = update_config() {
         match conf.update() {
             Ok(_) => {
-                println!("Update complete.");
+                panic!("Update complete.");
             }
             Err(e) => {
                 println!("Update not successful.\n{}", e);
