@@ -26,7 +26,7 @@ You can also play around with different ways of mounting the Joy-Con, with diffe
 
 ### Right Joy-Con
 
-The one I'm borrowing seems to be broken, so I can't try using it. Sorry. You'll have to figure it out yourself.
+Same as left Joy-Con, but with the joystick pointing inward. Note: I might change this in future versions to be same as left stick.
 
 ## Issues
 
