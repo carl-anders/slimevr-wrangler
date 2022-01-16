@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use deku::DekuContainerWrite;
+use deku::{DekuContainerWrite, DekuContainerRead};
 
 use crate::slime::deku::PacketType;
 
@@ -129,40 +129,56 @@ pub fn main_thread(
     address: &str,
 ) {
     let mut devices: HashMap<String, Device> = HashMap::new();
-    let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+
+    let addrs = [
+        SocketAddr::from(([0, 0, 0, 0], 47589)),
+        SocketAddr::from(([0, 0, 0, 0], 0)),
+    ];
+    let socket = UdpSocket::bind(&addrs[..]).unwrap();
     socket.set_nonblocking(true).ok();
     let address = address
         .parse::<SocketAddr>()
         .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap());
 
-    let mut any_response = false;
-    let mut last_handshake_try = Instant::now() - Duration::from_secs(60);
-    let mut buf = [0; 256];
+    let mut connected = false;
+    let mut last_handshake = Instant::now() - Duration::from_secs(60);
+    let mut last_ping = Instant::now();
+    let mut buf = [0; 512];
 
     loop {
-        if !any_response && last_handshake_try.elapsed().as_secs() >= 3 {
-            if socket.recv(&mut buf).is_ok() {
-                any_response = true;
+        if !connected && last_handshake.elapsed().as_secs() >= 3 {
+            last_handshake = Instant::now();
+            slime_handshake(&socket, &address);
+            for device in devices.values() {
+                device.handshake(&socket, &address);
             }
-            if !any_response {
-                last_handshake_try = Instant::now();
-                slime_handshake(&socket, &address);
-                for device in devices.values() {
-                    device.handshake(&socket, &address);
-                }
+        }
+        loop {
+            match socket.recv(&mut buf) {
+                Ok(len) => {
+                    connected = true;
+                    match PacketType::from_bytes((&buf, 0)) {
+                        Ok((_, packet)) => match packet {
+                            PacketType::Ping { id: _ } => {
+                                last_ping = Instant::now();
+                                socket.send_to(&buf[0..len], address).unwrap();
+                            },
+                            _ => {}
+                        },
+                        Err(_) => {},
+                    };
+                },
+                Err(_) => break,
             }
+        }
+        if connected && last_ping.elapsed().as_secs() >= 3 {
+            connected = false;
         }
 
         let mut got_message = false;
-        for _ in 0..2 {
-            for msg in receive.try_iter() {
-                got_message = true;
-                parse_message(msg, &mut devices, &socket, &address);
-            }
-            if got_message {
-                break;
-            }
-            thread::sleep(Duration::from_millis(2));
+        for msg in receive.try_iter() {
+            got_message = true;
+            parse_message(msg, &mut devices, &socket, &address);
         }
 
         if got_message {
@@ -175,6 +191,8 @@ pub fn main_thread(
                 });
             }
             let _drop = output_tx.send(statuses);
+        } else {
+            thread::sleep(Duration::from_nanos(1000));
         }
     }
 }

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::slime::deku::PacketType;
-    use deku::DekuContainerWrite;
+    use deku::{DekuContainerWrite, DekuContainerRead};
     use md5::{Digest, Md5};
     use nalgebra::{Quaternion, UnitQuaternion};
 
@@ -70,5 +70,13 @@ mod tests {
         ];
 
         assert_eq!(rotation.to_bytes().unwrap(), data);
+    }
+    #[test]
+    fn test_ping() {
+        let data = [0, 0, 0, 10, 1, 2, 3, 4];
+        let result = PacketType::from_bytes((&data, 0)).unwrap().1;
+
+        let ping = PacketType::Ping { id: 16909060 };
+        assert_eq!(result, ping);
     }
 }
