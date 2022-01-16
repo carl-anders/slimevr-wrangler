@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use deku::{DekuContainerWrite, DekuContainerRead};
+use deku::{DekuContainerRead, DekuContainerWrite};
 
 use crate::slime::deku::PacketType;
 
@@ -153,22 +153,11 @@ pub fn main_thread(
                 device.handshake(&socket, &address);
             }
         }
-        loop {
-            match socket.recv(&mut buf) {
-                Ok(len) => {
-                    connected = true;
-                    match PacketType::from_bytes((&buf, 0)) {
-                        Ok((_, packet)) => match packet {
-                            PacketType::Ping { id: _ } => {
-                                last_ping = Instant::now();
-                                socket.send_to(&buf[0..len], address).unwrap();
-                            },
-                            _ => {}
-                        },
-                        Err(_) => {},
-                    };
-                },
-                Err(_) => break,
+        while let Ok(len) = socket.recv(&mut buf) {
+            connected = true;
+            if let Ok((_, PacketType::Ping { id: _ })) = PacketType::from_bytes((&buf, 0)) {
+                last_ping = Instant::now();
+                socket.send_to(&buf[0..len], address).unwrap();
             }
         }
         if connected && last_ping.elapsed().as_secs() >= 3 {
