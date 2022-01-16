@@ -3538,18 +3538,26 @@ version = "0.2.0"
 dependencies = [
  "ahrs",
  "async-std",
- "deku",
  "directories",
  "iced",
  "iced_native",
  "itertools",
  "joycon",
  "joycon-rs",
- "md-5",
  "nalgebra",
  "self_update",
  "serde",
  "serde_json",
+ "slimevr_codec",
+]
+
+[[package]]
+name = "slimevr_codec"
+version = "0.0.1"
+dependencies = [
+ "deku",
+ "md-5",
+ "nalgebra",
 ]
 
 [[package]]

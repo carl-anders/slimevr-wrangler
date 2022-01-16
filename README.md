@@ -10,7 +10,7 @@ Use joy-Con's (+) as SlimeVR trackers, enabling you to make a full body system w
 You need bluetooth on your computer.
 * Download and set up [SlimeVR](https://docs.slimevr.dev/slimevr-setup.html)
 * Download [SlimeVR Wrangler](https://github.com/carl-anders/slimevr-wrangler/releases/latest/download/slimevr-wrangler.exe)
-* Start both the SlimeVR server and SlimeVR Wrangler 
+* Start both the SlimeVR server and SlimeVR Wrangler
 * Connect your Joy-Con trackers to the computer ([Guide for Windows](https://www.digitaltrends.com/gaming/how-to-connect-a-nintendo-switch-controller-to-a-pc/))
 * Make sure the SlimeVR server is running, then press "Search for Joycons" inside SlimeVR Wrangler
 * The Joy-Con should show up in the window!
@@ -45,6 +45,6 @@ This is a problem that might be related to a newer Windows update. Try this, and
 * Pair the device again. It should now show up.
 
 # License
-GPLv3
+The application code is licensed under GPLv3 due to a GPL dependency. The `slimevr_codec` crate is dually licensed under MIT and Apache 2.0, *not* GPLv3.
 
-If you contribute to this, you also agree to license your contributions with MIT License & Apache License, Version 2.0. This is because I might replace the GPL dependency in the future with something else.
+If you contribute to this repository, you also agree to license your contributions with MIT License & Apache License, Version 2.0. This is because I might eventually make the application code MIT/Apache 2.0 licensed in the future.

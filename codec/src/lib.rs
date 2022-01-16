@@ -1,6 +1,10 @@
+pub use deku; // re-export dependency used in public API
+
 use std::string::FromUtf8Error;
 
 use deku::prelude::*;
+
+#[cfg(feature = "nalgebra")]
 use nalgebra::Quaternion;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -11,6 +15,7 @@ pub struct SlimeQuaternion {
     pub k: f32,
     pub w: f32,
 }
+#[cfg(feature = "nalgebra")]
 impl From<Quaternion<f64>> for SlimeQuaternion {
     fn from(q: Quaternion<f64>) -> Self {
         Self {
@@ -21,6 +26,7 @@ impl From<Quaternion<f64>> for SlimeQuaternion {
         }
     }
 }
+#[cfg(feature = "nalgebra")]
 impl From<SlimeQuaternion> for Quaternion<f64> {
     fn from(q: SlimeQuaternion) -> Self {
         Self::new(q.w as _, q.i as _, q.j as _, q.k as _)
@@ -72,9 +78,7 @@ pub enum PacketType {
         mac_address: [u8; 6],
     },
     #[deku(id = "10")]
-    Ping {
-        id: u32,
-    },
+    Ping { id: u32 },
     #[deku(id = "15")]
     SensorInfo {
         packet_id: u64,

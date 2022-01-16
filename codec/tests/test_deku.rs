@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use crate::slime::deku::PacketType;
-    use deku::{DekuContainerWrite, DekuContainerRead};
     use md5::{Digest, Md5};
     use nalgebra::{Quaternion, UnitQuaternion};
+    use slimevr_codec::deku::{DekuContainerRead, DekuContainerWrite};
+    use slimevr_codec::PacketType;
 
     #[test]
     fn handshake() {

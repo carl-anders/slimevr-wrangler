@@ -1,7 +1,11 @@
+[workspace]
+members = ["codec"]
+
 [package]
 name = "slimevr-wrangler"
 version = "0.2.0"
 edition = "2021"
+license = "GPL-3.0-or-later"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,8 +22,7 @@ self_update = { version = "0.27", features = ["archive-zip", "compression-zip-de
 itertools = "0.10"
 ahrs = "0.4"
 nalgebra = "0.21"
-deku = "0.12"
-md-5 = "0.9"
+slimevr_codec = { path = "codec" }
 
 [features]
 default = ["use-joycon-rs"]

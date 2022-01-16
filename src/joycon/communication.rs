@@ -6,9 +6,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use deku::{DekuContainerRead, DekuContainerWrite};
-
-use crate::slime::deku::PacketType;
+use slimevr_codec::deku::{DekuContainerRead, DekuContainerWrite};
+use slimevr_codec::PacketType;
 
 use super::{
     imu::{Imu, JoyconAxisData},

@@ -1,0 +1,15 @@
+[package]
+name = "slimevr_codec"
+version = "0.0.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[features]
+default = ["nalgebra"]
+
+[dependencies]
+deku = "0.12"
+nalgebra = { version = "0.21", optional = true }
+
+[dev-dependencies]
+md-5 = "0.9"
