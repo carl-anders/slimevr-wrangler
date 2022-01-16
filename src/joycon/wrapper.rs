@@ -5,7 +5,7 @@ use super::{main_thread, spawn_thread, JoyconStatus};
 fn startup(address: String) -> mpsc::Receiver<Vec<JoyconStatus>> {
     let (out_tx, out_rx) = mpsc::channel();
     let (tx, rx) = mpsc::channel();
-    let _ = std::thread::spawn(move || main_thread(rx, out_tx, address));
+    let _drop = std::thread::spawn(move || main_thread(rx, out_tx, &address));
     std::thread::spawn(move || spawn_thread(tx));
     out_rx
 }

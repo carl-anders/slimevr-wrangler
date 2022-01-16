@@ -1,3 +1,6 @@
+#![deny(clippy::all)]
+#![allow(clippy::single_match)]
+
 use iced::{
     button, executor, scrollable, text_input, time, window, Align, Application, Button, Clipboard,
     Column, Command, Container, Element, Length, Row, Scrollable, Settings, Space, Subscription,
@@ -127,7 +130,7 @@ impl Application for MainState {
     fn subscription(&self) -> Subscription<Message> {
         let mut subs: Vec<Subscription<Message>> = vec![
             iced_native::subscription::events().map(Message::EventOccurred),
-            time::every(Duration::from_millis(500)).map(Message::Dot)
+            time::every(Duration::from_millis(500)).map(Message::Dot),
         ];
         if self.joycon.is_some() {
             subs.push(time::every(Duration::from_millis(100)).map(Message::Tick));
@@ -154,12 +157,12 @@ impl Application for MainState {
                 for status in self.joycon_statuses.clone() {
                     let info = Row::new()
                         .spacing(10)
-                        .push(self.joycon_svg.get(status.design).clone())
+                        .push(self.joycon_svg.get(&status.design).clone())
                         .push(Text::new(format!(
                             "roll: {:.0}\npitch: {:.0}\nyaw: {:.0}",
                             status.rotation.0, status.rotation.1, status.rotation.2
                         )));
-                    boxes.push(contain(info).style(style::Item::Normal))
+                    boxes.push(contain(info).style(style::Item::Normal));
                 }
                 boxes.push(
                     contain(

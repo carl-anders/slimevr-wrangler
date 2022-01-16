@@ -13,7 +13,7 @@ pub struct SlimeQuaternion {
 }
 impl From<Quaternion<f64>> for SlimeQuaternion {
     fn from(q: Quaternion<f64>) -> Self {
-        SlimeQuaternion {
+        Self {
             i: q.i as _,
             j: q.j as _,
             k: q.k as _,
@@ -23,7 +23,7 @@ impl From<Quaternion<f64>> for SlimeQuaternion {
 }
 impl From<SlimeQuaternion> for Quaternion<f64> {
     fn from(q: SlimeQuaternion) -> Self {
-        Quaternion::new(q.w as _, q.i as _, q.j as _, q.k as _)
+        Self::new(q.w as _, q.i as _, q.j as _, q.k as _)
     }
 }
 
@@ -38,7 +38,7 @@ pub struct SlimeString {
 impl From<String> for SlimeString {
     fn from(s: String) -> Self {
         let bytes = s.into_bytes();
-        SlimeString {
+        Self {
             count: bytes.len() as _,
             data: bytes,
         }

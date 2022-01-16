@@ -67,7 +67,7 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
             Err(_) => return,
         }
     };
-    let _ = devices.iter().try_for_each::<_, JoyConResult<()>>(|d| {
+    let _drop = devices.iter().try_for_each::<_, JoyConResult<()>>(|d| {
         let driver = SimpleJoyConDriver::new(&d)?;
         let joycon = driver.joycon();
         let color = joycon.color().clone();
@@ -79,9 +79,8 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
                     color.body[0], color.body[1], color.body[2]
                 ),
                 design_type: match joycon.device_type() {
-                    JoyConDeviceType::JoyConL => JoyconDesignType::Left,
+                    JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => JoyconDesignType::Left,
                     JoyConDeviceType::JoyConR => JoyconDesignType::Right,
-                    JoyConDeviceType::ProCon => JoyconDesignType::Left,
                 },
             },
         };

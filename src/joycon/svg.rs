@@ -20,8 +20,8 @@ pub struct JoyconSvg {
     map: HashMap<JoyconDesign, Svg>,
 }
 impl Default for JoyconSvg {
-    fn default() -> JoyconSvg {
-        JoyconSvg::new()
+    fn default() -> Self {
+        Self::new()
     }
 }
 impl JoyconSvg {
@@ -30,7 +30,7 @@ impl JoyconSvg {
             map: HashMap::new(),
         }
     }
-    pub fn get(&mut self, design: JoyconDesign) -> &Svg {
+    pub fn get(&mut self, design: &JoyconDesign) -> &Svg {
         match self.map.entry(design.clone()) {
             Occupied(entry) => entry.into_mut(),
             Vacant(entry) => {
