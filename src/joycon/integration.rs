@@ -1,5 +1,6 @@
 use super::imu::JoyconAxisData;
 use super::{ChannelInfo, JoyconData, JoyconDesign, JoyconDesignType, JoyconDeviceInfo};
+use joycon_rs::joycon::lights::{LightUp, Lights};
 use joycon_rs::prelude::*;
 use std::sync::mpsc;
 
@@ -68,7 +69,7 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
         }
     };
     let _drop = devices.iter().try_for_each::<_, JoyConResult<()>>(|d| {
-        let driver = SimpleJoyConDriver::new(&d)?;
+        let mut driver = SimpleJoyConDriver::new(&d)?;
         let joycon = driver.joycon();
         let color = joycon.color().clone();
         let info = JoyconDeviceInfo {
@@ -87,6 +88,8 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
         drop(joycon);
         let tx = tx.clone();
         tx.send(ChannelInfo::Connected(info)).unwrap();
+
+        driver.set_player_lights(&vec![LightUp::LED0, LightUp::LED3], &vec![]).ok();
 
         let standard = StandardFullMode::new(driver)?;
         std::thread::spawn(move || joycon_thread(standard, tx));
