@@ -1,5 +1,6 @@
 use super::imu::JoyconAxisData;
 use super::{ChannelInfo, JoyconData, JoyconDesign, JoyconDesignType, JoyconDeviceInfo};
+use joycon_rs::joycon::device::calibration::imu::IMUCalibration;
 use joycon_rs::joycon::lights::{LightUp, Lights};
 use joycon_rs::prelude::*;
 use std::sync::mpsc;
@@ -20,8 +21,20 @@ fn gyro(n: i16) -> f64 {
     * (std::f64::consts::PI / 180.0f64) // radians/s
 }
 
-fn joycon_thread(standard: StandardFullMode<SimpleJoyConDriver>, tx: mpsc::Sender<ChannelInfo>) {
+fn joycon_thread(
+    standard: StandardFullMode<SimpleJoyConDriver>,
+    tx: mpsc::Sender<ChannelInfo>,
+    calib: IMUCalibration,
+) {
     let sn = standard.driver().joycon().serial_number().to_owned();
+    let calib = match calib {
+        IMUCalibration::Available {
+            acc_origin_position: ao,
+            gyro_origin_position: go,
+            ..
+        } => ([ao.x, ao.y, ao.z], [go.x, go.y, go.z]),
+        IMUCalibration::Unavailable => ([0, 0, 0], [0, 0, 0]),
+    };
     loop {
         match standard.read_input_report() {
             Ok(report) => {
@@ -31,12 +44,12 @@ fn joycon_thread(standard: StandardFullMode<SimpleJoyConDriver>, tx: mpsc::Sende
                         .data
                         .iter()
                         .map(|data| JoyconAxisData {
-                            accel_x: acc(data.accel_x),
-                            accel_y: acc(data.accel_y),
-                            accel_z: acc(data.accel_z),
-                            gyro_x: gyro(data.gyro_1),
-                            gyro_y: gyro(data.gyro_2),
-                            gyro_z: gyro(data.gyro_3),
+                            accel_x: acc(data.accel_x - calib.0[0]),
+                            accel_y: acc(data.accel_y - calib.0[1]),
+                            accel_z: acc(data.accel_z - calib.0[2]),
+                            gyro_x: gyro(data.gyro_1 - calib.1[0]),
+                            gyro_y: gyro(data.gyro_2 - calib.1[1]),
+                            gyro_z: gyro(data.gyro_3 - calib.1[2]),
                         })
                         .collect::<Vec<_>>()
                         .as_slice()
@@ -51,7 +64,7 @@ fn joycon_thread(standard: StandardFullMode<SimpleJoyConDriver>, tx: mpsc::Sende
                 }
             }
             Err(JoyConError::Disconnected) => {
-                println!("Disconnected yo!");
+                println!("JoyCon disconnected");
                 return;
             }
             _ => {}
@@ -85,14 +98,22 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
                 },
             },
         };
+
+        let mut calib = joycon.imu_user_calibration().clone();
+        if calib == IMUCalibration::Unavailable {
+            calib = joycon.imu_factory_calibration().clone();
+        }
         drop(joycon);
+
         let tx = tx.clone();
         tx.send(ChannelInfo::Connected(info)).unwrap();
 
-        driver.set_player_lights(&vec![LightUp::LED0, LightUp::LED3], &vec![]).ok();
+        driver
+            .set_player_lights(&[LightUp::LED0, LightUp::LED3], &[])
+            .ok();
 
         let standard = StandardFullMode::new(driver)?;
-        std::thread::spawn(move || joycon_thread(standard, tx));
+        std::thread::spawn(move || joycon_thread(standard, tx, calib));
 
         Ok(())
     });
