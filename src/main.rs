@@ -1,5 +1,4 @@
 #![deny(clippy::all)]
-#![allow(clippy::single_match)]
 
 use iced::{
     button, executor, scrollable, text_input, time, window, Align, Application, Button, Clipboard,
@@ -94,14 +93,12 @@ impl Application for MainState {
             Message::SettingsPressed => {
                 self.settings_show = !self.settings_show;
             }
-            Message::EventOccurred(event) => match event {
-                iced_native::Event::Window(iced_native::window::Event::Resized {
-                    width, ..
-                }) => {
-                    self.num_columns = ((width - 20) / (300 + 20)) as usize;
-                }
-                _ => (),
-            },
+            Message::EventOccurred(iced_native::Event::Window(
+                iced_native::window::Event::Resized { width, .. },
+            )) => {
+                self.num_columns = ((width - 20) / (300 + 20)) as usize;
+            }
+            Message::EventOccurred(_) => {}
             Message::Tick(_time) => {
                 if let Some(ref ji) = self.joycon {
                     if let Some(res) = ji.poll() {

@@ -84,8 +84,8 @@ fn parse_message(
             device.handshake(socket, address);
             devices.insert(device_info.serial_number, device);
         }
-        ChannelInfo::Data(data) => match devices.get_mut(&data.serial_number) {
-            Some(device) => {
+        ChannelInfo::Data(data) => {
+            if let Some(device) = devices.get_mut(&data.serial_number) {
                 for frame in data.imu_data {
                     device.imu.update(frame);
                 }
@@ -102,8 +102,7 @@ fn parse_message(
                     .send_to(&rotation.to_bytes().unwrap(), address)
                     .unwrap();
             }
-            None => (),
-        },
+        }
     }
 }
 
