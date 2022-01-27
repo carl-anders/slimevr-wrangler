@@ -38,9 +38,10 @@ struct Device {
 impl Device {
     pub fn handshake(&self, socket: &UdpSocket, address: &SocketAddr) {
         let sensor_info = PacketType::SensorInfo {
-            packet_id: 1,
+            packet_id: 0,
             sensor_id: self.id,
             sensor_status: 1,
+            sensor_type: 0
         };
         socket
             .send_to(&sensor_info.to_bytes().unwrap(), address)
@@ -91,7 +92,7 @@ fn parse_message(
                 }
 
                 let rotation = PacketType::RotationData {
-                    packet_id: 1,
+                    packet_id: 0,
                     sensor_id: device.id,
                     data_type: 1,
                     quat: (*device.imu.rotation).into(),
@@ -108,7 +109,7 @@ fn parse_message(
 
 fn slime_handshake(socket: &UdpSocket, address: &SocketAddr) {
     let handshake = PacketType::Handshake {
-        packet_id: 1,
+        packet_id: 0,
         board: 0,
         imu: 0,
         mcu_type: 0,

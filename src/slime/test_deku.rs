@@ -46,10 +46,11 @@ mod tests {
         let sensor_info = PacketType::SensorInfo {
             packet_id: 1,
             sensor_id: 64,
-            sensor_status: 1,
+            sensor_status: 3,
+            sensor_type: 5
         };
 
-        let data: Vec<u8> = vec![0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 1, 64, 1];
+        let data: Vec<u8> = vec![0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 1, 64, 3, 5];
 
         assert_eq!(sensor_info.to_bytes().unwrap(), data);
     }

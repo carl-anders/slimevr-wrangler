@@ -80,6 +80,7 @@ pub enum PacketType {
         packet_id: u64,
         sensor_id: u8,
         sensor_status: u8,
+        sensor_type: u8,
     },
     #[deku(id = "17")]
     RotationData {
