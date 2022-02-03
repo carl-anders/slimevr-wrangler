@@ -2048,8 +2048,7 @@ dependencies = [
 [[package]]
 name = "joycon-rs"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a909e093eeb8158f53bb7f34c8d1ccd17af33fe79ddfd6d24c88b166b8ef3221"
+source = "git+https://github.com/carl-anders/joycon-rs#1680f924e3b1af2e9eda897f15437d69c9357227"
 dependencies = [
  "crossbeam-channel",
  "hidapi",

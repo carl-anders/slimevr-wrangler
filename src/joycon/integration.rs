@@ -3,7 +3,9 @@ use super::{ChannelInfo, JoyconData, JoyconDesign, JoyconDesignType, JoyconDevic
 use joycon_rs::joycon::device::calibration::imu::IMUCalibration;
 use joycon_rs::joycon::lights::{LightUp, Lights};
 use joycon_rs::prelude::*;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 // Gyro: 2000dps
 // Accel: 8G
@@ -21,9 +23,9 @@ fn gyro(n: i16) -> f64 {
     * (std::f64::consts::PI / 180.0f64) // radians/s
 }
 
-fn joycon_thread(
+fn joycon_listen_loop(
     standard: StandardFullMode<SimpleJoyConDriver>,
-    tx: mpsc::Sender<ChannelInfo>,
+    tx: &mpsc::Sender<ChannelInfo>,
     calib: IMUCalibration,
 ) {
     let sn = standard.driver().joycon().serial_number().to_owned();
@@ -64,11 +66,59 @@ fn joycon_thread(
                 }
             }
             Err(JoyConError::Disconnected) => {
-                println!("JoyCon disconnected");
                 return;
             }
             _ => {}
         }
+    }
+}
+
+fn joycon_thread(d: Arc<Mutex<JoyConDevice>>, tx: mpsc::Sender<ChannelInfo>) {
+    loop {
+        if match d.lock() {
+            Ok(d) => d,
+            Err(d) => d.into_inner(),
+        }
+        .is_connected()
+        {
+            if let Ok(mut driver) = SimpleJoyConDriver::new(&d) {
+                let joycon = driver.joycon();
+                let color = joycon.color().clone();
+                let info = JoyconDeviceInfo {
+                    serial_number: joycon.serial_number().to_owned(),
+                    design: JoyconDesign {
+                        color: format!(
+                            "#{:02x}{:02x}{:02x}",
+                            color.body[0], color.body[1], color.body[2]
+                        ),
+                        design_type: match joycon.device_type() {
+                            JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => {
+                                JoyconDesignType::Left
+                            }
+                            JoyConDeviceType::JoyConR => JoyconDesignType::Right,
+                        },
+                    },
+                };
+
+                let mut calib = joycon.imu_user_calibration().clone();
+                if calib == IMUCalibration::Unavailable {
+                    calib = joycon.imu_factory_calibration().clone();
+                }
+                drop(joycon);
+
+                tx.send(ChannelInfo::Connected(info)).unwrap();
+
+                driver
+                    .set_player_lights(&[LightUp::LED0, LightUp::LED3], &[])
+                    .ok();
+
+                if let Ok(standard) = StandardFullMode::new(driver) {
+                    joycon_listen_loop(standard, &tx, calib);
+                }
+            }
+        }
+        // Joycon was disconnected, check for reconnection after 1 second
+        thread::sleep(Duration::from_millis(1000));
     }
 }
 
@@ -81,40 +131,8 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
             Err(_) => return,
         }
     };
-    let _drop = devices.iter().try_for_each::<_, JoyConResult<()>>(|d| {
-        let mut driver = SimpleJoyConDriver::new(&d)?;
-        let joycon = driver.joycon();
-        let color = joycon.color().clone();
-        let info = JoyconDeviceInfo {
-            serial_number: joycon.serial_number().to_owned(),
-            design: JoyconDesign {
-                color: format!(
-                    "#{:02x}{:02x}{:02x}",
-                    color.body[0], color.body[1], color.body[2]
-                ),
-                design_type: match joycon.device_type() {
-                    JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => JoyconDesignType::Left,
-                    JoyConDeviceType::JoyConR => JoyconDesignType::Right,
-                },
-            },
-        };
-
-        let mut calib = joycon.imu_user_calibration().clone();
-        if calib == IMUCalibration::Unavailable {
-            calib = joycon.imu_factory_calibration().clone();
-        }
-        drop(joycon);
-
+    let _drop = devices.iter().for_each(|d| {
         let tx = tx.clone();
-        tx.send(ChannelInfo::Connected(info)).unwrap();
-
-        driver
-            .set_player_lights(&[LightUp::LED0, LightUp::LED3], &[])
-            .ok();
-
-        let standard = StandardFullMode::new(driver)?;
-        std::thread::spawn(move || joycon_thread(standard, tx, calib));
-
-        Ok(())
+        std::thread::spawn(move || joycon_thread(d, tx));
     });
 }

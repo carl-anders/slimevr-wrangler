@@ -76,6 +76,10 @@ fn parse_message(
 ) {
     match msg {
         ChannelInfo::Connected(device_info) => {
+            if devices.contains_key(&device_info.serial_number) {
+                devices.get_mut(&device_info.serial_number).unwrap().imu = Imu::new();
+                return;
+            }
             let id = devices.len() as _;
             let device = Device {
                 design: device_info.design,
