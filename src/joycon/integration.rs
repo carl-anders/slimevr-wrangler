@@ -28,7 +28,8 @@ fn joycon_listen_loop(
     tx: &mpsc::Sender<ChannelInfo>,
     calib: IMUCalibration,
 ) {
-    let sn = standard.driver().joycon().serial_number().to_owned();
+    let serial_number = standard.driver().joycon().serial_number().to_owned();
+    //let device_type = standard.driver().joycon().device_type();
     let calib = match calib {
         IMUCalibration::Available {
             acc_origin_position: ao,
@@ -45,6 +46,29 @@ fn joycon_listen_loop(
                         .extra
                         .data
                         .iter()
+                        /* Why doesn't this work better?
+                           Is SlimeVR needing it inverted or does the invesion happen somewhere else?
+                           Leaving everything to no change is the best so far.
+                        .map(|data| match device_type {
+                            JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => {
+                                JoyconAxisData {
+                                    accel_x: -acc(data.accel_x - calib.0[0]),
+                                    accel_y: acc(data.accel_y - calib.0[1]),
+                                    accel_z: acc(data.accel_z - calib.0[2]),
+                                    gyro_x: gyro(data.gyro_1 - calib.1[0]),
+                                    gyro_y: -gyro(data.gyro_2 - calib.1[1]),
+                                    gyro_z: -gyro(data.gyro_3 - calib.1[2]),
+                                }
+                            }
+                            JoyConDeviceType::JoyConR => JoyconAxisData {
+                                accel_x: -acc(data.accel_x - calib.0[0]),
+                                accel_y: -acc(data.accel_y - calib.0[1]),
+                                accel_z: -acc(data.accel_z - calib.0[2]),
+                                gyro_x: gyro(data.gyro_1 - calib.1[0]),
+                                gyro_y: gyro(data.gyro_2 - calib.1[1]),
+                                gyro_z: gyro(data.gyro_3 - calib.1[2]),
+                            },
+                        })*/
                         .map(|data| JoyconAxisData {
                             accel_x: acc(data.accel_x - calib.0[0]),
                             accel_y: acc(data.accel_y - calib.0[1]),
@@ -58,7 +82,7 @@ fn joycon_listen_loop(
                         .try_into()
                         .unwrap();
                     let data = JoyconData {
-                        serial_number: sn.clone(),
+                        serial_number: serial_number.clone(),
                         //battery_level: report.common.battery.level,
                         imu_data,
                     };

@@ -3,7 +3,7 @@
 use iced::{
     button, executor, scrollable, text_input, time, window, Align, Application, Button, Clipboard,
     Column, Command, Container, Element, Length, Row, Scrollable, Settings, Space, Subscription,
-    Text, TextInput,
+    Svg, Text, TextInput,
 };
 use itertools::Itertools;
 use std::{
@@ -16,7 +16,6 @@ mod settings;
 mod slime;
 mod style;
 mod update;
-use settings::WranglerSettings;
 
 //const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -43,12 +42,20 @@ enum Message {
     AddressChanged(String),
     UpdateFound(Option<String>),
     UpdatePressed,
+    JoyconRotate(String, bool),
+}
+
+#[derive(Default)]
+struct Buttons {
+    enable_joycon: button::State,
+    settings: button::State,
+    update: button::State,
 }
 
 #[derive(Default)]
 struct MainState {
     joycon: Option<JoyconIntegration>,
-    joycon_statuses: Vec<JoyconStatus>,
+    joycon_boxes: Vec<JoyconBox>,
     joycon_svg: JoyconSvg,
     num_columns: usize,
     search_dots: usize,
@@ -56,12 +63,10 @@ struct MainState {
 
     address_state: text_input::State,
 
-    settings: WranglerSettings,
+    settings: settings::Handler,
     update_found: Option<String>,
 
-    button_enable_joycon: button::State,
-    button_settings: button::State,
-    button_update: button::State,
+    buttons: Buttons,
     scroll: scrollable::State,
 }
 impl Application for MainState {
@@ -74,7 +79,6 @@ impl Application for MainState {
             Self {
                 num_columns: 3,
                 joycon_svg: JoyconSvg::new(),
-                settings: WranglerSettings::new(),
                 ..Self::default()
             },
             Command::perform(update::check_updates(), Message::UpdateFound),
@@ -88,7 +92,7 @@ impl Application for MainState {
     fn update(&mut self, message: Message, _: &mut Clipboard) -> Command<Self::Message> {
         match message {
             Message::EnableJoyconsPressed => {
-                self.joycon = Some(JoyconIntegration::new(self.settings.address.clone()));
+                self.joycon = Some(JoyconIntegration::new(self.settings.clone()));
             }
             Message::SettingsPressed => {
                 self.settings_show = !self.settings_show;
@@ -101,8 +105,17 @@ impl Application for MainState {
             Message::EventOccurred(_) => {}
             Message::Tick(_time) => {
                 if let Some(ref ji) = self.joycon {
-                    if let Some(res) = ji.poll() {
-                        self.joycon_statuses = res;
+                    if let Some(mut res) = ji.poll() {
+                        if res.len() == self.joycon_boxes.len() {
+                            for i in 0..self.joycon_boxes.len() {
+                                self.joycon_boxes[i].status = res.remove(0);
+                            }
+                        } else {
+                            self.joycon_boxes = Vec::new();
+                            for _ in 0..res.len() {
+                                self.joycon_boxes.push(JoyconBox::new(res.remove(0)));
+                            }
+                        }
                     }
                 }
             }
@@ -110,7 +123,7 @@ impl Application for MainState {
                 self.search_dots = (self.search_dots + 1) % 4;
             }
             Message::AddressChanged(value) => {
-                self.settings.address = value;
+                self.settings.local.address = value;
                 self.settings.save();
             }
             Message::UpdateFound(version) => {
@@ -119,6 +132,21 @@ impl Application for MainState {
             Message::UpdatePressed => {
                 self.update_found = None;
                 update::update();
+            }
+            Message::JoyconRotate(serial_number, direction) => {
+                let entry = self
+                    .settings
+                    .local
+                    .joycon
+                    .entry(serial_number.clone())
+                    .or_insert(crate::settings::Joycon { rotation: 0 });
+                entry.rotation += if direction { 90 } else { -90 };
+                entry.rotation %= 360;
+                if entry.rotation < 0 {
+                    entry.rotation += 360;
+                }
+                println!("Offset for joycon {} set to: {:?}°", serial_number, entry.rotation);
+                self.settings.save();
             }
         }
         Command::none()
@@ -138,9 +166,10 @@ impl Application for MainState {
     fn view(&mut self) -> Element<Message> {
         let mut main_container;
         if self.settings_show {
-            let mut all_settings = Column::new()
-                .spacing(20)
-                .push(address(&mut self.address_state, &self.settings.address));
+            let mut all_settings = Column::new().spacing(20).push(address(
+                &mut self.address_state,
+                &self.settings.local.address,
+            ));
             if self.joycon.is_some() {
                 all_settings = all_settings.push(Text::new("You need to restart this program to apply the settings as you have already initialized search for controllers."));
             }
@@ -151,15 +180,9 @@ impl Application for MainState {
             let mut boxes: Vec<Container<Message>> = Vec::new();
 
             if self.joycon.is_some() {
-                for status in self.joycon_statuses.clone() {
-                    let info = Row::new()
-                        .spacing(10)
-                        .push(self.joycon_svg.get(&status.design).clone())
-                        .push(Text::new(format!(
-                            "roll: {:.0}\npitch: {:.0}\nyaw: {:.0}",
-                            status.rotation.0, status.rotation.1, status.rotation.2
-                        )));
-                    boxes.push(contain(info).style(style::Item::Normal));
+                for joycon_box in &mut self.joycon_boxes {
+                    let svg = self.joycon_svg.get(&joycon_box.status.design).clone();
+                    boxes.push(contain(joycon_box.view(svg)).style(style::Item::Normal));
                 }
                 boxes.push(
                     contain(
@@ -180,7 +203,7 @@ impl Application for MainState {
                     .push(Text::new("Add new trackers"))
                     .push(
                         Button::new(
-                            &mut self.button_enable_joycon,
+                            &mut self.buttons.enable_joycon,
                             Text::new("Search for Joycons"),
                         )
                         .on_press(Message::EnableJoyconsPressed)
@@ -201,8 +224,8 @@ impl Application for MainState {
             .style(style::Background::Darker);
 
         let top_bar = top_bar(
-            &mut self.button_settings,
-            &mut self.button_update,
+            &mut self.buttons.settings,
+            &mut self.buttons.update,
             self.update_found.clone(),
         );
 
@@ -291,4 +314,46 @@ fn top_bar<'a>(
         .width(Length::Fill)
         .padding(20)
         .style(style::Background::Highlight)
+}
+
+#[derive(Debug, Clone)]
+struct JoyconBox {
+    left: button::State,
+    right: button::State,
+    pub status: JoyconStatus,
+}
+
+impl JoyconBox {
+    fn new(status: JoyconStatus) -> Self {
+        Self {
+            left: button::State::new(),
+            right: button::State::new(),
+            status,
+        }
+    }
+    fn view(&mut self, svg: Svg) -> Row<Message> {
+        Row::new()
+            .spacing(10)
+            .push(svg)
+            .push(Text::new(format!(
+                "roll: {:.0}\npitch: {:.0}\nyaw: {:.0}",
+                self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
+            )))
+            .push(
+                Button::new(&mut self.left, Text::new("←"))
+                    .on_press(Message::JoyconRotate(
+                        self.status.serial_number.clone(),
+                        false,
+                    ))
+                    .style(style::Button::Primary),
+            )
+            .push(
+                Button::new(&mut self.right, Text::new("→"))
+                    .on_press(Message::JoyconRotate(
+                        self.status.serial_number.clone(),
+                        true,
+                    ))
+                    .style(style::Button::Primary),
+            )
+    }
 }

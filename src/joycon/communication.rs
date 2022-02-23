@@ -7,8 +7,9 @@ use std::{
 };
 
 use deku::{DekuContainerRead, DekuContainerWrite};
+use nalgebra::{UnitQuaternion, Vector3};
 
-use crate::slime::deku::PacketType;
+use crate::{settings, slime::deku::PacketType};
 
 use super::{
     imu::{Imu, JoyconAxisData},
@@ -20,6 +21,7 @@ pub struct JoyconStatus {
     pub connected: bool,
     pub rotation: (f64, f64, f64),
     pub design: JoyconDesign,
+    pub serial_number: String,
 }
 
 #[derive(Debug, Clone)]
@@ -41,7 +43,7 @@ impl Device {
             packet_id: 0,
             sensor_id: self.id,
             sensor_status: 1,
-            sensor_type: 0
+            sensor_type: 0,
         };
         socket
             .send_to(&sensor_info.to_bytes().unwrap(), address)
@@ -73,6 +75,7 @@ fn parse_message(
     devices: &mut HashMap<String, Device>,
     socket: &UdpSocket,
     address: &SocketAddr,
+    settings: &settings::Handler,
 ) {
     match msg {
         ChannelInfo::Connected(device_info) => {
@@ -94,12 +97,21 @@ fn parse_message(
                 for frame in data.imu_data {
                     device.imu.update(frame);
                 }
+                let rotated = if let Some(js) = settings.local.joycon.get(&data.serial_number) {
+                    device.imu.rotation
+                        * UnitQuaternion::from_axis_angle(
+                            &Vector3::z_axis(),
+                            js.rotation as f64 * (std::f64::consts::TAU / 360.0),
+                        )
+                } else {
+                    device.imu.rotation
+                };
 
                 let rotation = PacketType::RotationData {
                     packet_id: 0,
                     sensor_id: device.id,
                     data_type: 1,
-                    quat: (*device.imu.rotation).into(),
+                    quat: (*rotated).into(),
                     calibration_info: 0,
                 };
 
@@ -130,7 +142,7 @@ fn slime_handshake(socket: &UdpSocket, address: &SocketAddr) {
 pub fn main_thread(
     receive: mpsc::Receiver<ChannelInfo>,
     output_tx: mpsc::Sender<Vec<JoyconStatus>>,
-    address: &str,
+    mut settings: settings::Handler,
 ) {
     let mut devices: HashMap<String, Device> = HashMap::new();
 
@@ -140,7 +152,9 @@ pub fn main_thread(
     ];
     let socket = UdpSocket::bind(&addrs[..]).unwrap();
     socket.set_nonblocking(true).ok();
-    let address = address
+    let address = settings
+        .local
+        .address
         .parse::<SocketAddr>()
         .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap());
 
@@ -171,21 +185,24 @@ pub fn main_thread(
         let mut got_message = false;
         for msg in receive.try_iter() {
             got_message = true;
-            parse_message(msg, &mut devices, &socket, &address);
+            parse_message(msg, &mut devices, &socket, &address, &settings);
         }
 
         if got_message {
             let mut statuses = Vec::new();
-            for device in devices.values() {
+            for (serial_number, device) in &devices {
                 statuses.push(JoyconStatus {
                     connected: true,
                     rotation: device.imu.euler_angles_deg(),
                     design: device.design.clone(),
+                    serial_number: serial_number.clone(),
                 });
             }
             let _drop = output_tx.send(statuses);
         } else {
             thread::sleep(Duration::from_nanos(1000));
         }
+
+        settings.reload();
     }
 }
