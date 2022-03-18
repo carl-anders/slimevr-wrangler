@@ -3533,7 +3533,7 @@ checksum = "9def91fd1e018fe007022791f865d0ccc9b3a0d5001e01aabb8b40e46000afb5"
 
 [[package]]
 name = "slimevr-wrangler"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "ahrs",
  "async-std",
