@@ -21,6 +21,7 @@ pub struct JoyconStatus {
     pub connected: bool,
     pub rotation: (f64, f64, f64),
     pub design: JoyconDesign,
+    pub mount_rotation: i32,
     pub serial_number: String,
 }
 
@@ -195,6 +196,11 @@ pub fn main_thread(
                     connected: true,
                     rotation: device.imu.euler_angles_deg(),
                     design: device.design.clone(),
+                    mount_rotation: if let Some(js) = settings.local.joycon.get(serial_number) {
+                        js.rotation
+                    } else {
+                        0
+                    },
                     serial_number: serial_number.clone(),
                 });
             }

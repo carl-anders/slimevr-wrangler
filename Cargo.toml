@@ -31,3 +31,4 @@ lto = true
 codegen-units = 1
 # panic = "abort" # Doesn't allow threads to catch themselves
 opt-level = "s"
+strip = true

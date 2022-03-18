@@ -145,7 +145,10 @@ impl Application for MainState {
                 if entry.rotation < 0 {
                     entry.rotation += 360;
                 }
-                println!("Offset for joycon {} set to: {:?}°", serial_number, entry.rotation);
+                println!(
+                    "Offset for joycon {} set to: {:?}°",
+                    serial_number, entry.rotation
+                );
                 self.settings.save();
             }
         }
@@ -181,7 +184,10 @@ impl Application for MainState {
 
             if self.joycon.is_some() {
                 for joycon_box in &mut self.joycon_boxes {
-                    let svg = self.joycon_svg.get(&joycon_box.status.design).clone();
+                    let svg = self
+                        .joycon_svg
+                        .get(&joycon_box.status.design, joycon_box.status.mount_rotation)
+                        .clone();
                     boxes.push(contain(joycon_box.view(svg)).style(style::Item::Normal));
                 }
                 boxes.push(
@@ -204,7 +210,7 @@ impl Application for MainState {
                     .push(
                         Button::new(
                             &mut self.buttons.enable_joycon,
-                            Text::new("Search for Joycons"),
+                            Text::new("Search for Joy-Con's"),
                         )
                         .on_press(Message::EnableJoyconsPressed)
                         .style(style::Button::Primary),
@@ -332,13 +338,8 @@ impl JoyconBox {
         }
     }
     fn view(&mut self, svg: Svg) -> Row<Message> {
-        Row::new()
+        let buttons = Row::new()
             .spacing(10)
-            .push(svg)
-            .push(Text::new(format!(
-                "roll: {:.0}\npitch: {:.0}\nyaw: {:.0}",
-                self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
-            )))
             .push(
                 Button::new(&mut self.left, Text::new("←"))
                     .on_press(Message::JoyconRotate(
@@ -354,6 +355,16 @@ impl JoyconBox {
                         true,
                     ))
                     .style(style::Button::Primary),
-            )
+            );
+        let left = Column::new()
+            .spacing(10)
+            .align_items(Align::Center)
+            .push(buttons)
+            .push(svg);
+
+        Row::new().spacing(10).push(left).push(Text::new(format!(
+            "roll: {:.0}\npitch: {:.0}\nyaw: {:.0}",
+            self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
+        )))
     }
 }

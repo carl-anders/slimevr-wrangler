@@ -8,7 +8,7 @@ static RIGHT: &str = include_str!("../../assets/joycon-right.svg");
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum JoyconDesignType {
     Left,
-    Right
+    Right,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -17,7 +17,7 @@ pub struct JoyconDesign {
     pub design_type: JoyconDesignType,
 }
 pub struct JoyconSvg {
-    map: HashMap<JoyconDesign, Svg>,
+    map: HashMap<(JoyconDesign, i32), Svg>,
 }
 impl Default for JoyconSvg {
     fn default() -> Self {
@@ -30,14 +30,19 @@ impl JoyconSvg {
             map: HashMap::new(),
         }
     }
-    pub fn get(&mut self, design: &JoyconDesign) -> &Svg {
-        match self.map.entry(design.clone()) {
+    pub fn get(&mut self, design: &JoyconDesign, rotation: i32) -> &Svg {
+        match self.map.entry((design.clone(), rotation)) {
             Occupied(entry) => entry.into_mut(),
             Vacant(entry) => {
                 let svg_code = match design.design_type {
-                    JoyconDesignType::Left => LEFT.replace("#3fa9f5", &design.color),
-                    JoyconDesignType::Right => RIGHT.replace("#ff1d25", &design.color)
-                };
+                    JoyconDesignType::Left => LEFT,
+                    JoyconDesignType::Right => RIGHT,
+                }
+                .replace("#3fa9f5", &design.color)
+                .replace("rotate(0", &format!("rotate({:}", (rotation + 90) % 360));
+                // Rotation is how many degrees clockwise joycons are rotated from their "starting position".
+                // Left starts with rail down. Right starts with rail up.
+                // The svg's are not consistent with that so needs to be rotated an extra 90 degrees.
 
                 entry.insert(Svg::new(Handle::from_memory(svg_code)))
             }

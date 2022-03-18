@@ -1,10 +1,8 @@
 # SlimeVR Wrangler
 
-Use joy-Con's (+) as SlimeVR trackers, enabling you to make a full body system with your existing devices. Combine with DIY SlimeVR trackers, or phones using owoTrack.
+Use Joy-Con's as SlimeVR trackers, enabling you to make a full body system with your existing devices. Combine with DIY SlimeVR trackers, or phones using owoTrack.
 
 ![Screenshot of the app running and tracking a single Joy-Con](screenshot.png)
-
-(+) More devices planned to be added.
 
 ## Setup
 You need bluetooth on your computer.
@@ -16,17 +14,13 @@ You need bluetooth on your computer.
 * The Joy-Con should show up in the window!
 * Follow the SlimeVR documentation to set up the new tracker, with the direction below:
 
-### Left Joy-Con
+### Mounting
 
-The rail that attaches to the switch device should be pointed toward your feet, with the joystick pointing forward.
+Attach the Joy-Con's in the direction that works best for you, use the SlimeVR guide to see the positions on your body.
 
-In SlimeVR server, set direction to "forward".
+Keep the joystick pointed outwards, it should not poke into your skin.
 
-You can also play around with different ways of mounting the Joy-Con, with different directions in the SlimeVR server.
-
-### Right Joy-Con
-
-Same as left Joy-Con, but with the joystick pointing inward. Note: I might change this in future versions to be same as left stick.
+After connecting the Joy-Con's in the program, rotate them in the program to be the same rotation as they are if you are standing up.
 
 ## Issues
 
@@ -34,7 +28,6 @@ Many! This is a **alpha** version, and there's no guarantees about anything.
 
 * Rotation tracking is bad! - Yup, sorry. In the future there will be settings to help fine tune the tracking. I suggest binding a button to reset.
 * It stops tracking when I turn around! - Bluetooth does not have a good range, you might have better luck with a different bluetooth adapter.
-* It crashes when I reconnect the Joy-Con! - Yeah, working on fixing this. You'll just have to restart the SlimeVR Wrangler program.
 * Probably more.
 
 ### My Joy-Con's are connected in the Windows bluetooth menu but won't show up!
