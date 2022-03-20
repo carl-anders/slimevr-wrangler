@@ -17,13 +17,13 @@ mod slime;
 mod style;
 mod update;
 
-//const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const WINDOW_SIZE: (u32, u32) = (980, 700);
 
 pub fn main() -> iced::Result {
     let settings = Settings {
         window: window::Settings {
-            min_size: Some((980, 700)),
-            size: (980, 700),
+            min_size: Some(WINDOW_SIZE),
+            size: WINDOW_SIZE,
             ..window::Settings::default()
         },
         antialiasing: true,
@@ -100,7 +100,9 @@ impl Application for MainState {
             Message::EventOccurred(iced_native::Event::Window(
                 iced_native::window::Event::Resized { width, .. },
             )) => {
-                self.num_columns = ((width - 20) / (300 + 20)) as usize;
+                if width >= WINDOW_SIZE.0 {
+                    self.num_columns = ((width - 20) / (300 + 20)) as usize;
+                }
             }
             Message::EventOccurred(_) => {}
             Message::Tick(_time) => {
