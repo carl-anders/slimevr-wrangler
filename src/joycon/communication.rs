@@ -76,7 +76,7 @@ fn parse_message(
     devices: &mut HashMap<String, Device>,
     socket: &UdpSocket,
     address: &SocketAddr,
-    settings: &settings::Handler,
+    settings: &settings::WranglerSettings,
 ) {
     match msg {
         ChannelInfo::Connected(device_info) => {
@@ -98,26 +98,27 @@ fn parse_message(
                 for frame in data.imu_data {
                     device.imu.update(frame);
                 }
-                let rotated = if let Some(js) = settings.local.joycon.get(&data.serial_number) {
+
+                let joycon_rotation = settings.joycon_rotation_get(&data.serial_number);
+                let rotated_quat = if joycon_rotation > 0 {
                     device.imu.rotation
                         * UnitQuaternion::from_axis_angle(
                             &Vector3::z_axis(),
-                            js.rotation as f64 * (std::f64::consts::TAU / 360.0),
+                            joycon_rotation as f64 * (std::f64::consts::TAU / 360.0),
                         )
                 } else {
                     device.imu.rotation
                 };
 
-                let rotation = PacketType::RotationData {
+                let rotation_packet = PacketType::RotationData {
                     packet_id: 0,
                     sensor_id: device.id,
                     data_type: 1,
-                    quat: (*rotated).into(),
+                    quat: (*rotated_quat).into(),
                     calibration_info: 0,
                 };
-
                 socket
-                    .send_to(&rotation.to_bytes().unwrap(), address)
+                    .send_to(&rotation_packet.to_bytes().unwrap(), address)
                     .unwrap();
             }
         }
@@ -143,7 +144,7 @@ fn slime_handshake(socket: &UdpSocket, address: &SocketAddr) {
 pub fn main_thread(
     receive: mpsc::Receiver<ChannelInfo>,
     output_tx: mpsc::Sender<Vec<JoyconStatus>>,
-    mut settings: settings::Handler,
+    settings: settings::Handler,
 ) {
     let mut devices: HashMap<String, Device> = HashMap::new();
 
@@ -153,11 +154,14 @@ pub fn main_thread(
     ];
     let socket = UdpSocket::bind(&addrs[..]).unwrap();
     socket.set_nonblocking(true).ok();
-    let address = settings
-        .local
-        .address
-        .parse::<SocketAddr>()
-        .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap());
+    let address = {
+        settings
+            .load()
+            .address
+            .clone()
+            .parse::<SocketAddr>()
+            .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap())
+    };
 
     let mut connected = false;
     let mut last_handshake = Instant::now() - Duration::from_secs(60);
@@ -165,6 +169,7 @@ pub fn main_thread(
     let mut buf = [0; 512];
 
     loop {
+        let settings = settings.load();
         if !connected && last_handshake.elapsed().as_secs() >= 3 {
             last_handshake = Instant::now();
             slime_handshake(&socket, &address);
@@ -183,24 +188,20 @@ pub fn main_thread(
             connected = false;
         }
 
-        let mut got_message = false;
+        let mut received_message = false;
         for msg in receive.try_iter() {
-            got_message = true;
+            received_message = true;
             parse_message(msg, &mut devices, &socket, &address, &settings);
         }
 
-        if got_message {
+        if received_message {
             let mut statuses = Vec::new();
             for (serial_number, device) in &devices {
                 statuses.push(JoyconStatus {
                     connected: true,
                     rotation: device.imu.euler_angles_deg(),
                     design: device.design.clone(),
-                    mount_rotation: if let Some(js) = settings.local.joycon.get(serial_number) {
-                        js.rotation
-                    } else {
-                        0
-                    },
+                    mount_rotation: settings.joycon_rotation_get(serial_number),
                     serial_number: serial_number.clone(),
                 });
             }
@@ -208,7 +209,5 @@ pub fn main_thread(
         } else {
             thread::sleep(Duration::from_nanos(1000));
         }
-
-        settings.reload();
     }
 }

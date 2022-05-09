@@ -39,7 +39,7 @@ enum Message {
     SettingsPressed,
     Tick(Instant),
     Dot(Instant),
-    AddressChanged(String),
+    AddressChange(String),
     UpdateFound(Option<String>),
     UpdatePressed,
     JoyconRotate(String, bool),
@@ -124,9 +124,8 @@ impl Application for MainState {
             Message::Dot(_time) => {
                 self.search_dots = (self.search_dots + 1) % 4;
             }
-            Message::AddressChanged(value) => {
-                self.settings.local.address = value;
-                self.settings.save();
+            Message::AddressChange(value) => {
+                self.settings.change(|ws| ws.address = value);
             }
             Message::UpdateFound(version) => {
                 self.update_found = version;
@@ -136,22 +135,9 @@ impl Application for MainState {
                 update::update();
             }
             Message::JoyconRotate(serial_number, direction) => {
-                let entry = self
-                    .settings
-                    .local
-                    .joycon
-                    .entry(serial_number.clone())
-                    .or_insert(crate::settings::Joycon { rotation: 0 });
-                entry.rotation += if direction { 90 } else { -90 };
-                entry.rotation %= 360;
-                if entry.rotation < 0 {
-                    entry.rotation += 360;
-                }
-                println!(
-                    "Offset for joycon {} set to: {:?}°",
-                    serial_number, entry.rotation
-                );
-                self.settings.save();
+                self.settings.change(|ws| {
+                    ws.joycon_rotation_add(serial_number, if direction { 90 } else { -90 })
+                });
             }
         }
         Command::none()
@@ -163,7 +149,7 @@ impl Application for MainState {
             time::every(Duration::from_millis(500)).map(Message::Dot),
         ];
         if self.joycon.is_some() {
-            subs.push(time::every(Duration::from_millis(100)).map(Message::Tick));
+            subs.push(time::every(Duration::from_millis(50)).map(Message::Tick));
         }
         Subscription::batch(subs)
     }
@@ -173,7 +159,7 @@ impl Application for MainState {
         if self.settings_show {
             let mut all_settings = Column::new().spacing(20).push(address(
                 &mut self.address_state,
-                &self.settings.local.address,
+                &self.settings.load().address,
             ));
             if self.joycon.is_some() {
                 all_settings = all_settings.push(Text::new("You need to restart this program to apply the settings as you have already initialized search for controllers."));
@@ -271,17 +257,12 @@ fn float_list<'a>(
     list
 }
 fn address<'a>(input: &'a mut text_input::State, input_value: &str) -> Column<'a, Message> {
-    let adress_info = Text::new("Enter a valid ip with port number:");
-    let adress = TextInput::new(
-        input,
-        "127.0.0.1:6969",
-        input_value,
-        Message::AddressChanged,
-    )
-    .width(Length::Units(500))
-    .padding(10);
+    let address_info = Text::new("Enter a valid ip with port number:");
+    let address = TextInput::new(input, "127.0.0.1:6969", input_value, Message::AddressChange)
+        .width(Length::Units(500))
+        .padding(10);
 
-    let mut allc = Column::new().spacing(10).push(adress_info).push(adress);
+    let mut allc = Column::new().spacing(10).push(address_info).push(address);
 
     if input_value.parse::<SocketAddr>().is_ok() {
         allc = allc.push(Space::new(Length::Fill, Length::Units(20)));

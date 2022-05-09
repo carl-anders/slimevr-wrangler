@@ -1,13 +1,6 @@
-use std::{
-    collections::HashMap,
-    fs,
-    fs::File,
-    io::BufReader,
-    path::PathBuf,
-    sync::{Arc, RwLock},
-    time::Instant,
-};
+use std::{collections::HashMap, fs, fs::File, io::BufReader, path::PathBuf, sync::Arc};
 
+use arc_swap::{ArcSwap, Guard};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
@@ -18,9 +11,10 @@ fn file_name() -> Option<PathBuf> {
 pub struct Joycon {
     pub rotation: i32,
 }
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct WranglerSettings {
     pub address: String,
+    #[serde(default)]
     pub joycon: HashMap<String, Joycon>,
 }
 impl WranglerSettings {
@@ -33,7 +27,7 @@ impl WranglerSettings {
             .ok()
             .and_then(|file| serde_json::to_writer(file, self).ok());
     }
-    pub fn new() -> Self {
+    pub fn load() -> Self {
         file_name()
             .and_then(|path| File::open(path).ok())
             .and_then(|file| serde_json::from_reader(BufReader::new(file)).ok())
@@ -42,33 +36,35 @@ impl WranglerSettings {
                 joycon: HashMap::new(),
             })
     }
+    pub fn joycon_rotation_add(&mut self, serial_number: String, degrees: i32) {
+        let entry = self.joycon.entry(serial_number).or_default();
+        entry.rotation = (entry.rotation + degrees).rem_euclid(360);
+    }
+    pub fn joycon_rotation_get(&self, serial_number: &str) -> i32 {
+        self.joycon.get(serial_number).map_or(0, |j| j.rotation)
+    }
+}
+impl Default for WranglerSettings {
+    fn default() -> Self {
+        WranglerSettings::load()
+    }
 }
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct Handler {
-    pub local: WranglerSettings,
-    remote: Arc<RwLock<WranglerSettings>>,
-    updated: Instant,
+    arc: Arc<ArcSwap<WranglerSettings>>,
 }
 impl Handler {
-    pub fn reload(&mut self) {
-        if Instant::now().duration_since(self.updated).as_millis() > 250 {
-            self.local = self.remote.read().unwrap().clone();
-            self.updated = Instant::now();
-        }
+    pub fn load(&self) -> Guard<Arc<WranglerSettings>> {
+        self.arc.load()
     }
-    pub fn save(&mut self) {
-        *self.remote.write().unwrap() = self.local.clone();
-        self.local.save();
-    }
-}
-impl Default for Handler {
-    fn default() -> Self {
-        let settings = WranglerSettings::new();
-        Handler {
-            local: settings.clone(),
-            remote: Arc::new(RwLock::new(settings)),
-            updated: Instant::now(),
-        }
+    pub fn change<T>(&self, func: T)
+    where
+        T: FnOnce(&mut WranglerSettings),
+    {
+        let mut current = (**self.arc.load()).clone();
+        func(&mut current);
+        current.save();
+        self.arc.store(Arc::new(current));
     }
 }
