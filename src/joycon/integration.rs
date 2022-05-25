@@ -1,5 +1,6 @@
 use super::imu::JoyconAxisData;
 use super::{ChannelInfo, JoyconData, JoyconDesign, JoyconDesignType, JoyconDeviceInfo};
+use crate::settings;
 use joycon_rs::joycon::device::calibration::imu::IMUCalibration;
 use joycon_rs::joycon::lights::{LightUp, Lights};
 use joycon_rs::prelude::*;
@@ -17,8 +18,11 @@ fn acc(n: i16) -> f64 {
 }
 // Convert to acceleration in radians/s
 // TODO: add option for different numbers - or find the right magic
-fn gyro(n: i16) -> f64 {
-    n as f64
+fn gyro(n: i16, offset: i16, scale: f64) -> f64 {
+    (n - offset) as f64
+    * scale
+    // NOTE: 13371 is technically a value present in flash, in practice it seems to be constant.
+    //* (936.0 / (13371 - offset) as f64) // to degrees/s
     * 0.07000839246f64 // 4588/65535 - degrees/s
     * (std::f64::consts::PI / 180.0f64) // radians/s
 }
@@ -27,6 +31,7 @@ fn joycon_listen_loop(
     standard: StandardFullMode<SimpleJoyConDriver>,
     tx: &mpsc::Sender<ChannelInfo>,
     calib: IMUCalibration,
+    settings: &settings::Handler,
 ) {
     let serial_number = standard.driver().joycon().serial_number().to_owned();
     let device_type = standard.driver().joycon().device_type();
@@ -42,6 +47,12 @@ fn joycon_listen_loop(
         match standard.read_input_report() {
             Ok(report) => {
                 if report.common.input_report_id == 48 {
+                    let gyro_scale_factor = settings
+                        .load()
+                        .joycon
+                        .get(&serial_number)
+                        .map(|s| s.gyro_scale_factor)
+                        .unwrap_or(1.0);
                     let imu_data = report
                         .extra
                         .data
@@ -52,18 +63,18 @@ fn joycon_listen_loop(
                                     accel_x: acc(data.accel_x - calib.0[0]),
                                     accel_y: acc(data.accel_y - calib.0[1]),
                                     accel_z: acc(data.accel_z - calib.0[2]),
-                                    gyro_x: gyro(data.gyro_1 - calib.1[0]),
-                                    gyro_y: gyro(data.gyro_2 - calib.1[1]),
-                                    gyro_z: gyro(data.gyro_3 - calib.1[2]),
+                                    gyro_x: gyro(data.gyro_1, calib.1[0], gyro_scale_factor),
+                                    gyro_y: gyro(data.gyro_2, calib.1[1], gyro_scale_factor),
+                                    gyro_z: gyro(data.gyro_3, calib.1[2], gyro_scale_factor),
                                 }
                             }
                             JoyConDeviceType::JoyConR => JoyconAxisData {
                                 accel_x: acc(data.accel_x - calib.0[0]),
                                 accel_y: -acc(data.accel_y - calib.0[1]),
                                 accel_z: -acc(data.accel_z - calib.0[2]),
-                                gyro_x: gyro(data.gyro_1 - calib.1[0]),
-                                gyro_y: -gyro(data.gyro_2 - calib.1[1]),
-                                gyro_z: -gyro(data.gyro_3 - calib.1[2]),
+                                gyro_x: gyro(data.gyro_1, calib.1[0], gyro_scale_factor),
+                                gyro_y: -gyro(data.gyro_2, calib.1[1], gyro_scale_factor),
+                                gyro_z: -gyro(data.gyro_3, calib.1[2], gyro_scale_factor),
                             },
                         })
                         .collect::<Vec<_>>()
@@ -86,7 +97,7 @@ fn joycon_listen_loop(
     }
 }
 
-fn joycon_thread(d: Arc<Mutex<JoyConDevice>>, tx: mpsc::Sender<ChannelInfo>) {
+fn joycon_thread(d: Arc<Mutex<JoyConDevice>>, tx: mpsc::Sender<ChannelInfo>, settings: settings::Handler) {
     loop {
         if match d.lock() {
             Ok(d) => d,
@@ -126,7 +137,7 @@ fn joycon_thread(d: Arc<Mutex<JoyConDevice>>, tx: mpsc::Sender<ChannelInfo>) {
                     .ok();
 
                 if let Ok(standard) = StandardFullMode::new(driver) {
-                    joycon_listen_loop(standard, &tx, calib);
+                    joycon_listen_loop(standard, &tx, calib, &settings);
                 }
             }
         }
@@ -135,7 +146,7 @@ fn joycon_thread(d: Arc<Mutex<JoyConDevice>>, tx: mpsc::Sender<ChannelInfo>) {
     }
 }
 
-pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
+pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>, settings: settings::Handler) {
     let manager = JoyConManager::get_instance();
     let devices = {
         let lock = manager.lock();
@@ -146,6 +157,7 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
     };
     let _drop = devices.iter().for_each(|d| {
         let tx = tx.clone();
-        std::thread::spawn(move || joycon_thread(d, tx));
+        let settings = settings.clone();
+        std::thread::spawn(move || joycon_thread(d, tx, settings));
     });
 }

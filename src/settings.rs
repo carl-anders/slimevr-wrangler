@@ -7,10 +7,21 @@ use serde::{Deserialize, Serialize};
 fn file_name() -> Option<PathBuf> {
     ProjectDirs::from("", "", "SlimeVR Wrangler").map(|pd| pd.config_dir().join("config.json"))
 }
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Joycon {
     pub rotation: i32,
+    pub gyro_scale_factor: f64, //[f64; 3],
 }
+
+impl Default for Joycon {
+    fn default() -> Self {
+        Joycon {
+            rotation: 0,
+            gyro_scale_factor: 1.0, //[1.0; 3]
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WranglerSettings {
     pub address: String,
