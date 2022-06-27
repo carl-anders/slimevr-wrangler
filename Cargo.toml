@@ -14,12 +14,12 @@ async-std = "1.0"
 joycon-rs = { git = "https://github.com/carl-anders/joycon-rs", optional = true }
 joycon = { git = "https://github.com/Yamakaky/joy", optional = true }
 directories = "4.0"
-self_update = { version = "0.27", features = ["archive-zip", "compression-zip-deflate"] }
+self_update = { version = "0.30", features = ["archive-zip", "compression-zip-deflate"] }
 itertools = "0.10"
-ahrs = "0.4"
-nalgebra = "0.21"
-deku = "0.12"
-md-5 = "0.9"
+ahrs = "0.5"
+nalgebra = "0.30"
+deku = "0.13"
+md-5 = "0.10"
 arc-swap = "1.5"
 
 [features]
