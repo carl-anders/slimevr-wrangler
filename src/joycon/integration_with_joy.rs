@@ -1,6 +1,7 @@
 use super::communication::{ChannelInfo, JoyconData, JoyconDeviceInfo};
 use super::imu::JoyconAxisData;
 use super::{JoyconDesign, JoyconDesignType};
+use crate::settings;
 use joycon::joycon_sys::spi::ControllerColor;
 use joycon::{
     hidapi::HidApi,
@@ -56,7 +57,7 @@ fn joycon_thread(sn: String, mut joycon: JoyCon, tx: mpsc::Sender<ChannelInfo>) 
     }
 }
 
-pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>) {
+pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>, settings: settings::Handler) {
     let mut api = HidApi::new().unwrap();
     let mut connected_controllers: HashSet<String> = HashSet::new();
     loop {
