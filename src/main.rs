@@ -1,9 +1,9 @@
 #![deny(clippy::all)]
 
 use iced::{
-    button, executor, scrollable, text_input, time, window, Align, Application, Button, Clipboard,
+    button, executor, scrollable, text_input, time, window, Application, Button,
     Column, Command, Container, Element, Length, Row, Scrollable, Settings, Space, Subscription,
-    Svg, Text, TextInput,
+    Svg, Text, TextInput, Alignment,
 };
 use itertools::Itertools;
 use std::{
@@ -89,7 +89,7 @@ impl Application for MainState {
         String::from("SlimeVR Wrangler")
     }
 
-    fn update(&mut self, message: Message, _: &mut Clipboard) -> Command<Self::Message> {
+    fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
             Message::EnableJoyconsPressed => {
                 self.joycon = Some(JoyconIntegration::new(self.settings.clone()));
@@ -188,7 +188,7 @@ impl Application for MainState {
                                 search_dots
                             ))
                         )
-                        .align_items(Align::Center),
+                        .align_items(Alignment::Center),
                     ).style(style::Item::Special)
                 );
             } else {
@@ -279,7 +279,7 @@ fn top_bar<'a>(
     update: Option<String>,
 ) -> Container<'a, Message> {
     let mut top_column = Row::new()
-        .align_items(Align::Center)
+        .align_items(Alignment::Center)
         .push(Text::new("SlimeVR Wrangler").size(24));
 
     if let Some(u) = update {
@@ -341,7 +341,7 @@ impl JoyconBox {
             );
         let left = Column::new()
             .spacing(10)
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .push(buttons)
             .push(svg);
 
