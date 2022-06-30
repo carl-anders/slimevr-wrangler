@@ -10,14 +10,14 @@ fn file_name() -> Option<PathBuf> {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Joycon {
     pub rotation: i32,
-    pub gyro_scale_factor: f64, //[f64; 3],
+    pub gyro_scale_factor: f64,
 }
 
 impl Default for Joycon {
     fn default() -> Self {
         Joycon {
             rotation: 0,
-            gyro_scale_factor: 1.0, //[1.0; 3]
+            gyro_scale_factor: 1.0,
         }
     }
 }
@@ -53,6 +53,13 @@ impl WranglerSettings {
     }
     pub fn joycon_rotation_get(&self, serial_number: &str) -> i32 {
         self.joycon.get(serial_number).map_or(0, |j| j.rotation)
+    }
+    pub fn joycon_scale_set(&mut self, serial_number: String, scale: f64) {
+        let entry = self.joycon.entry(serial_number).or_default();
+        entry.gyro_scale_factor = scale;
+    }
+    pub fn joycon_scale_get(&self, serial_number: &str) -> f64 {
+        self.joycon.get(serial_number).map_or(1.0, |j| j.gyro_scale_factor)
     }
 }
 impl Default for WranglerSettings {

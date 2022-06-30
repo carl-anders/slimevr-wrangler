@@ -207,7 +207,7 @@ pub fn main_thread(
             }
             let _drop = output_tx.send(statuses);
         } else {
-            thread::sleep(Duration::from_nanos(1000));
+            thread::sleep(Duration::from_micros(500));
         }
     }
 }

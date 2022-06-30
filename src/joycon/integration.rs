@@ -47,12 +47,7 @@ fn joycon_listen_loop(
         match standard.read_input_report() {
             Ok(report) => {
                 if report.common.input_report_id == 48 {
-                    let gyro_scale_factor = settings
-                        .load()
-                        .joycon
-                        .get(&serial_number)
-                        .map(|s| s.gyro_scale_factor)
-                        .unwrap_or(1.0);
+                    let gyro_scale_factor = settings.load().joycon_scale_get(&serial_number);
                     let imu_data = report
                         .extra
                         .data
@@ -97,7 +92,11 @@ fn joycon_listen_loop(
     }
 }
 
-fn joycon_thread(d: Arc<Mutex<JoyConDevice>>, tx: mpsc::Sender<ChannelInfo>, settings: settings::Handler) {
+fn joycon_thread(
+    d: Arc<Mutex<JoyConDevice>>,
+    tx: mpsc::Sender<ChannelInfo>,
+    settings: settings::Handler,
+) {
     loop {
         if match d.lock() {
             Ok(d) => d,

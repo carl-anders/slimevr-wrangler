@@ -3,7 +3,7 @@
 use iced::{
     button, executor, scrollable, text_input, time, window, Application, Button,
     Column, Command, Container, Element, Length, Row, Scrollable, Settings, Space, Subscription,
-    Svg, Text, TextInput, Alignment,
+    Svg, Text, TextInput, Alignment, slider, Slider,
 };
 use itertools::Itertools;
 use std::{
@@ -43,6 +43,7 @@ enum Message {
     UpdateFound(Option<String>),
     UpdatePressed,
     JoyconRotate(String, bool),
+    JoyconScale(String, f64),
 }
 
 #[derive(Default)]
@@ -139,6 +140,10 @@ impl Application for MainState {
                     ws.joycon_rotation_add(serial_number, if direction { 90 } else { -90 })
                 });
             }
+            Message::JoyconScale(serial_number, scale) => {
+                self.settings
+                    .change(|ws| ws.joycon_scale_set(serial_number, scale));
+            }
         }
         Command::none()
     }
@@ -176,7 +181,11 @@ impl Application for MainState {
                         .joycon_svg
                         .get(&joycon_box.status.design, joycon_box.status.mount_rotation)
                         .clone();
-                    boxes.push(contain(joycon_box.view(svg)).style(style::Item::Normal));
+                    let scale = self
+                        .settings
+                        .load()
+                        .joycon_scale_get(&joycon_box.status.serial_number);
+                    boxes.push(contain(joycon_box.view(svg, scale)).style(style::Item::Normal));
                 }
                 boxes.push(
                     contain(
@@ -232,7 +241,7 @@ where
     T: Into<Element<'a, M>>,
 {
     Container::new(content)
-        .height(Length::Units(200))
+        .height(Length::Units(250))
         .width(Length::Units(300))
         .padding(10)
 }
@@ -309,6 +318,7 @@ fn top_bar<'a>(
 struct JoyconBox {
     left: button::State,
     right: button::State,
+    slider: slider::State,
     pub status: JoyconStatus,
 }
 
@@ -317,14 +327,15 @@ impl JoyconBox {
         Self {
             left: button::State::new(),
             right: button::State::new(),
+            slider: slider::State::new(),
             status,
         }
     }
-    fn view(&mut self, svg: Svg) -> Row<Message> {
+    fn view(&mut self, svg: Svg, scale: f64) -> Column<Message> {
         let buttons = Row::new()
             .spacing(10)
             .push(
-                Button::new(&mut self.left, Text::new("←"))
+                Button::new(&mut self.left, Text::new("Left"))
                     .on_press(Message::JoyconRotate(
                         self.status.serial_number.clone(),
                         false,
@@ -332,7 +343,7 @@ impl JoyconBox {
                     .style(style::Button::Primary),
             )
             .push(
-                Button::new(&mut self.right, Text::new("→"))
+                Button::new(&mut self.right, Text::new("Right"))
                     .on_press(Message::JoyconRotate(
                         self.status.serial_number.clone(),
                         true,
@@ -343,11 +354,30 @@ impl JoyconBox {
             .spacing(10)
             .align_items(Alignment::Center)
             .push(buttons)
-            .push(svg);
+            .push(svg)
+            .width(Length::Units(150));
 
-        Row::new().spacing(10).push(left).push(Text::new(format!(
-            "roll: {:.0}\npitch: {:.0}\nyaw: {:.0}",
-            self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
-        )))
+        let top = Row::new()
+            .spacing(10)
+            .push(left)
+            .push(Text::new(format!(
+                "roll: {:.0}\npitch: {:.0}\nyaw: {:.0}",
+                self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
+            )))
+            .height(Length::Units(160));
+
+        let sn = self.status.serial_number.clone();
+
+        let bottom = Column::new()
+            .spacing(10)
+            .push(
+                Slider::new(&mut self.slider, 0.8..=1.2, scale, move |c| {
+                    Message::JoyconScale(sn.clone(), c)
+                })
+                .step(0.001),
+            )
+            .push(Text::new(format!("rotation scale ratio: {:.3}", scale)));
+
+        Column::new().spacing(10).push(top).push(bottom)
     }
 }
