@@ -2862,7 +2862,7 @@ checksum = "eb703cfe953bccee95685111adeedb76fabe4e97549a58d16f03ea7b9367bb32"
 
 [[package]]
 name = "slimevr-wrangler"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "ahrs",
  "arc-swap",
