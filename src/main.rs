@@ -241,7 +241,7 @@ where
     T: Into<Element<'a, M>>,
 {
     Container::new(content)
-        .height(Length::Units(250))
+        .height(Length::Units(280))
         .width(Length::Units(300))
         .padding(10)
 }
@@ -361,7 +361,7 @@ impl JoyconBox {
             .spacing(10)
             .push(left)
             .push(Text::new(format!(
-                "roll: {:.0}\npitch: {:.0}\nyaw: {:.0}",
+                "Roll: {:.0}\nPitch: {:.0}\nYaw: {:.0}",
                 self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
             )))
             .height(Length::Units(160));
@@ -376,7 +376,8 @@ impl JoyconBox {
                 })
                 .step(0.001),
             )
-            .push(Text::new(format!("rotation scale ratio: {:.3}", scale)));
+            .push(Text::new(format!("Rotation scale ratio: {:.3}", scale)))
+            .push(Text::new("Change this if the tracker in vr moves less or more than your irl joycon. Higher value = more movement.").size(14));
 
         Column::new().spacing(10).push(top).push(bottom)
     }
