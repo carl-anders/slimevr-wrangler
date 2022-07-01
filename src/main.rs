@@ -1,9 +1,9 @@
 #![deny(clippy::all)]
 
 use iced::{
-    button, executor, scrollable, text_input, time, window, Application, Button,
-    Column, Command, Container, Element, Length, Row, Scrollable, Settings, Space, Subscription,
-    Svg, Text, TextInput, Alignment, slider, Slider,
+    button, executor, scrollable, slider, text_input, time, window, Alignment, Application, Button,
+    Column, Command, Container, Element, Font, Length, Row, Scrollable, Settings, Slider, Space,
+    Subscription, Svg, Text, TextInput,
 };
 use itertools::Itertools;
 use std::{
@@ -18,6 +18,11 @@ mod style;
 mod update;
 
 const WINDOW_SIZE: (u32, u32) = (980, 700);
+
+pub const ICONS: Font = Font::External {
+    name: "Icons",
+    bytes: include_bytes!("../assets/icons.ttf"),
+};
 
 pub fn main() -> iced::Result {
     let settings = Settings {
@@ -335,7 +340,7 @@ impl JoyconBox {
         let buttons = Row::new()
             .spacing(10)
             .push(
-                Button::new(&mut self.left, Text::new("Left"))
+                Button::new(&mut self.left, Text::new("↺").font(ICONS))
                     .on_press(Message::JoyconRotate(
                         self.status.serial_number.clone(),
                         false,
@@ -343,7 +348,7 @@ impl JoyconBox {
                     .style(style::Button::Primary),
             )
             .push(
-                Button::new(&mut self.right, Text::new("Right"))
+                Button::new(&mut self.right, Text::new("↻").font(ICONS))
                     .on_press(Message::JoyconRotate(
                         self.status.serial_number.clone(),
                         true,
