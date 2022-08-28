@@ -25,6 +25,20 @@ pub const ICONS: Font = Font::External {
 };
 
 pub fn main() -> iced::Result {
+    if std::env::var("WRANGLER_HEADLESS").is_ok() {
+        let settings = settings::Handler::default();
+        let integration = JoyconIntegration::new(settings.clone());
+
+        for status in integration.iter() {
+            println!("{esc}[2J{esc}[1;1HCurrent Status:", esc = 27 as char);
+            for joycon in status {
+                println!("{} ({}): {:.3?} connected: {}", joycon.serial_number, joycon.design.color, joycon.rotation, joycon.connected);
+            }
+        }
+        
+        return Ok(())
+    }
+
     let settings = Settings {
         window: window::Settings {
             min_size: Some(WINDOW_SIZE),

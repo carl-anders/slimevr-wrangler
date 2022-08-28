@@ -25,4 +25,7 @@ impl JoyconIntegration {
     pub fn poll(&self) -> Option<Vec<JoyconStatus>> {
         self.rx.try_iter().last()
     }
+    pub fn iter(&self) -> impl Iterator<Item=Vec<JoyconStatus>> + '_ {
+        self.rx.iter()
+    }
 }
