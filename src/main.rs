@@ -13,7 +13,6 @@ use std::{
 mod joycon;
 use crate::joycon::{JoyconIntegration, JoyconStatus, JoyconSvg};
 mod settings;
-mod slime;
 mod style;
 mod update;
 

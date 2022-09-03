@@ -8,13 +8,13 @@ use std::{
 
 use deku::{DekuContainerRead, DekuContainerWrite};
 use nalgebra::{UnitQuaternion, Vector3};
-
-use crate::{settings, slime::deku::PacketType};
+use protocol::PacketType;
 
 use super::{
     imu::{Imu, JoyconAxisData},
     JoyconDesign,
 };
+use crate::settings;
 
 #[derive(Debug, Clone)]
 pub struct JoyconStatus {

@@ -1,0 +1,15 @@
+[package]
+name = "protocol"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+deku = "0.13"
+# Retain compatibility across two nalgebra versions due to its churn.
+nalgebra = ">=0.30,<0.32"
+
+
+[dev-dependencies]
+md-5 = "0.10"
