@@ -31,7 +31,7 @@ pub struct JoyconDeviceInfo {
     pub design: JoyconDesign,
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct Device {
     imu: Imu,
     design: JoyconDesign,

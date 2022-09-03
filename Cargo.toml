@@ -16,11 +16,12 @@ joycon = { git = "https://github.com/Yamakaky/joy", optional = true }
 directories = "4.0"
 self_update = { version = "0.30", features = ["archive-zip", "compression-zip-deflate"] }
 itertools = "0.10"
-ahrs = "0.5"
+#ahrs = "0.5"
 nalgebra = "0.30"
 deku = "0.13"
 md-5 = "0.10"
 arc-swap = "1.5"
+vqf-cxx = { git = "https://github.com/kitlith/vqf-cxx", version = "0.1" }
 
 [features]
 default = ["use-joycon-rs"]
