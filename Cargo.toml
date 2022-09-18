@@ -20,7 +20,7 @@ nalgebra = "0.30"
 deku = "0.13"
 md-5 = "0.10"
 arc-swap = "1.5"
-vqf-cxx = { git = "https://github.com/kitlith/vqf-cxx", version = "0.1" }
+vqf-cxx = { git = "https://github.com/carl-anders/vqf-cxx", version = "0.1" }
 
 [features]
 default = ["use-joycon-rs"]
