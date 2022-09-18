@@ -38,6 +38,6 @@ This is a problem that might be related to a newer Windows update. Try this, and
 * Pair the device again. It should now show up.
 
 # License
-GPLv3
+Licensed under either of <a href="LICENSE-APACHE">Apache License, Version 2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
 
-If you contribute to this, you also agree to license your contributions with MIT License & Apache License, Version 2.0. This is because I might replace the GPL dependency in the future with something else.
+<sup>Old versions using the rust package "ahrs" are licensed with GPL v2, check the git history for the license on your chosen commit.</sup>
