@@ -47,6 +47,8 @@ enum Message {
     AddressChange(String),
     UpdateFound(Option<String>),
     UpdatePressed,
+    BlacklistChecked(joycon::BlacklistResult),
+    BlacklistFixPressed,
     JoyconRotate(String, bool),
     JoyconScale(String, f64),
 }
@@ -56,6 +58,7 @@ struct Buttons {
     enable_joycon: button::State,
     settings: button::State,
     update: button::State,
+    fix_blacklist: button::State,
 }
 
 #[derive(Default)]
@@ -71,6 +74,7 @@ struct MainState {
 
     settings: settings::Handler,
     update_found: Option<String>,
+    blacklist_info: joycon::BlacklistResult,
 
     buttons: Buttons,
     scroll: scrollable::State,
@@ -87,7 +91,10 @@ impl Application for MainState {
                 joycon_svg: JoyconSvg::new(),
                 ..Self::default()
             },
-            Command::perform(update::check_updates(), Message::UpdateFound),
+            Command::batch(vec![
+                Command::perform(update::check_updates(), Message::UpdateFound),
+                Command::perform(joycon::check_blacklist(), Message::BlacklistChecked),
+            ]),
         )
     }
 
@@ -139,6 +146,14 @@ impl Application for MainState {
             Message::UpdatePressed => {
                 self.update_found = None;
                 update::update();
+            }
+            Message::BlacklistChecked(info) => {
+                self.blacklist_info = info;
+            }
+            Message::BlacklistFixPressed => {
+                self.blacklist_info =
+                    joycon::BlacklistResult::info("Updating steam config file.....");
+                return Command::perform(joycon::update_blacklist(), Message::BlacklistChecked);
             }
             Message::JoyconRotate(serial_number, direction) => {
                 self.settings.change(|ws| {
@@ -237,7 +252,14 @@ impl Application for MainState {
             self.update_found.clone(),
         );
 
-        Column::new().push(top_bar).push(main_container).into()
+        let mut app = Column::new().push(top_bar);
+        if self.blacklist_info.visible() {
+            app = app.push(blacklist_bar(
+                &self.blacklist_info,
+                &mut self.buttons.fix_blacklist,
+            ));
+        }
+        app.push(main_container).into()
     }
 }
 
@@ -317,6 +339,27 @@ fn top_bar<'a>(
         .width(Length::Fill)
         .padding(20)
         .style(style::Background::Highlight)
+}
+
+fn blacklist_bar<'a>(
+    result: &joycon::BlacklistResult,
+    button_fix_blacklist: &'a mut button::State,
+) -> Container<'a, Message> {
+    let mut row = Row::new()
+        .align_items(Alignment::Center)
+        .push(Text::new(result.info.clone()))
+        .push(Space::new(Length::Units(20), Length::Shrink));
+    if result.fix_button {
+        row = row.push(
+            Button::new(button_fix_blacklist, Text::new("Fix blacklist"))
+                .style(style::Button::Primary)
+                .on_press(Message::BlacklistFixPressed),
+        );
+    }
+    Container::new(row)
+        .width(Length::Fill)
+        .padding(20)
+        .style(style::Background::Info)
 }
 
 #[derive(Debug, Clone)]

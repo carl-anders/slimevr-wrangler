@@ -12,6 +12,7 @@ const HOVERED: Color = color_rgb!(0x50, 0x28, 0x82);
 
 pub enum Background {
     Highlight,
+    Info,
     Darker,
 }
 
@@ -19,6 +20,7 @@ impl container::StyleSheet for Background {
     fn style(&self) -> container::Style {
         let bg = match self {
             Background::Highlight => Color::from_rgb8(0x66, 0x34, 0x99),
+            Background::Info => Color::from_rgb8(0x42, 0x44, 0x45),
             Background::Darker => Color::from_rgb8(0x26, 0x28, 0x29),
         };
         container::Style {

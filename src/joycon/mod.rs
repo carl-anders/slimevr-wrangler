@@ -15,6 +15,9 @@ mod integration_with_joy;
 #[cfg(all(not(feature = "use-joycon-rs"), feature = "use-joy"))]
 use integration_with_joy::spawn_thread;
 
+mod steam_blacklist;
+pub use steam_blacklist::*;
+
 mod wrapper;
 pub use wrapper::*;
 
