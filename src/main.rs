@@ -11,6 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 mod joycon;
+mod steam_blacklist;
 use crate::joycon::{JoyconIntegration, JoyconStatus, JoyconSvg};
 mod settings;
 mod slime;
@@ -47,7 +48,7 @@ enum Message {
     AddressChange(String),
     UpdateFound(Option<String>),
     UpdatePressed,
-    BlacklistChecked(joycon::BlacklistResult),
+    BlacklistChecked(steam_blacklist::BlacklistResult),
     BlacklistFixPressed,
     JoyconRotate(String, bool),
     JoyconScale(String, f64),
@@ -74,7 +75,7 @@ struct MainState {
 
     settings: settings::Handler,
     update_found: Option<String>,
-    blacklist_info: joycon::BlacklistResult,
+    blacklist_info: steam_blacklist::BlacklistResult,
 
     buttons: Buttons,
     scroll: scrollable::State,
@@ -93,7 +94,7 @@ impl Application for MainState {
             },
             Command::batch(vec![
                 Command::perform(update::check_updates(), Message::UpdateFound),
-                Command::perform(joycon::check_blacklist(), Message::BlacklistChecked),
+                Command::perform(steam_blacklist::check_blacklist(), Message::BlacklistChecked),
             ]),
         )
     }
@@ -152,8 +153,8 @@ impl Application for MainState {
             }
             Message::BlacklistFixPressed => {
                 self.blacklist_info =
-                    joycon::BlacklistResult::info("Updating steam config file.....");
-                return Command::perform(joycon::update_blacklist(), Message::BlacklistChecked);
+                steam_blacklist::BlacklistResult::info("Updating steam config file.....");
+                return Command::perform(steam_blacklist::update_blacklist(), Message::BlacklistChecked);
             }
             Message::JoyconRotate(serial_number, direction) => {
                 self.settings.change(|ws| {
@@ -342,7 +343,7 @@ fn top_bar<'a>(
 }
 
 fn blacklist_bar<'a>(
-    result: &joycon::BlacklistResult,
+    result: &steam_blacklist::BlacklistResult,
     button_fix_blacklist: &'a mut button::State,
 ) -> Container<'a, Message> {
     let mut row = Row::new()

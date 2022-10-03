@@ -8,9 +8,6 @@ use communication::*;
 mod integration;
 use integration::spawn_thread;
 
-mod steam_blacklist;
-pub use steam_blacklist::*;
-
 mod wrapper;
 pub use wrapper::*;
 
