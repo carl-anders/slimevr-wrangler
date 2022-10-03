@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::slime::deku::PacketType;
-    use deku::{DekuContainerWrite, DekuContainerRead};
+    use deku::{DekuContainerRead, DekuContainerWrite};
     use md5::{Digest, Md5};
     use nalgebra::{Quaternion, UnitQuaternion};
 
@@ -47,7 +47,7 @@ mod tests {
             packet_id: 1,
             sensor_id: 64,
             sensor_status: 3,
-            sensor_type: 5
+            sensor_type: 5,
         };
 
         let data: Vec<u8> = vec![0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 1, 64, 3, 5];

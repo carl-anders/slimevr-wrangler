@@ -1,6 +1,5 @@
-use vqf_cxx::{VQF, VQFBuilder};
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
-
+use vqf_cxx::{VQFBuilder, VQF};
 
 fn deg(r: f64) -> f64 {
     r * (180.0f64 / std::f64::consts::PI)

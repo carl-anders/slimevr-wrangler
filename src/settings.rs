@@ -59,7 +59,9 @@ impl WranglerSettings {
         entry.gyro_scale_factor = scale;
     }
     pub fn joycon_scale_get(&self, serial_number: &str) -> f64 {
-        self.joycon.get(serial_number).map_or(1.0, |j| j.gyro_scale_factor)
+        self.joycon
+            .get(serial_number)
+            .map_or(1.0, |j| j.gyro_scale_factor)
     }
 }
 impl Default for WranglerSettings {

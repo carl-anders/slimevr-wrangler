@@ -72,9 +72,7 @@ pub enum PacketType {
         mac_address: [u8; 6],
     },
     #[deku(id = "10")]
-    Ping {
-        id: u32,
-    },
+    Ping { id: u32 },
     #[deku(id = "15")]
     SensorInfo {
         packet_id: u64,

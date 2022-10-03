@@ -13,6 +13,7 @@ use std::{
 mod joycon;
 mod steam_blacklist;
 use crate::joycon::{JoyconIntegration, JoyconStatus, JoyconSvg};
+use steam_blacklist as blacklist;
 mod settings;
 mod slime;
 mod style;
@@ -48,7 +49,7 @@ enum Message {
     AddressChange(String),
     UpdateFound(Option<String>),
     UpdatePressed,
-    BlacklistChecked(steam_blacklist::BlacklistResult),
+    BlacklistChecked(blacklist::BlacklistResult),
     BlacklistFixPressed,
     JoyconRotate(String, bool),
     JoyconScale(String, f64),
@@ -75,7 +76,7 @@ struct MainState {
 
     settings: settings::Handler,
     update_found: Option<String>,
-    blacklist_info: steam_blacklist::BlacklistResult,
+    blacklist_info: blacklist::BlacklistResult,
 
     buttons: Buttons,
     scroll: scrollable::State,
@@ -94,7 +95,7 @@ impl Application for MainState {
             },
             Command::batch(vec![
                 Command::perform(update::check_updates(), Message::UpdateFound),
-                Command::perform(steam_blacklist::check_blacklist(), Message::BlacklistChecked),
+                Command::perform(blacklist::check_blacklist(), Message::BlacklistChecked),
             ]),
         )
     }
@@ -153,8 +154,8 @@ impl Application for MainState {
             }
             Message::BlacklistFixPressed => {
                 self.blacklist_info =
-                steam_blacklist::BlacklistResult::info("Updating steam config file.....");
-                return Command::perform(steam_blacklist::update_blacklist(), Message::BlacklistChecked);
+                    blacklist::BlacklistResult::info("Updating steam config file.....");
+                return Command::perform(blacklist::update_blacklist(), Message::BlacklistChecked);
             }
             Message::JoyconRotate(serial_number, direction) => {
                 self.settings.change(|ws| {
@@ -343,7 +344,7 @@ fn top_bar<'a>(
 }
 
 fn blacklist_bar<'a>(
-    result: &steam_blacklist::BlacklistResult,
+    result: &blacklist::BlacklistResult,
     button_fix_blacklist: &'a mut button::State,
 ) -> Container<'a, Message> {
     let mut row = Row::new()
