@@ -10,9 +10,8 @@ fn check_valid(config: &Vdf) -> Result<(), BlacklistError> {
         .value
         .get_obj()
         .and_then(|o| o.get("Software"))
-        .map(|s| !s.is_empty())
-        .unwrap_or(false)
-        .then(|| ())
+        .map_or(false, |s| !s.is_empty())
+        .then_some(())
         .ok_or(BlacklistError::Invalid)
 }
 
@@ -106,7 +105,7 @@ pub enum Device {
 }
 
 impl Device {
-    pub fn ids(&self) -> Vec<String> {
+    pub fn ids(self) -> Vec<String> {
         match self {
             Device::Joycon => vec![
                 "0x057e/0x2006".into(),
@@ -136,7 +135,7 @@ impl Blacklist {
             .into_iter()
             .chain(device.ids().into_iter())
             .unique()
-            .collect()
+            .collect();
     }
     /*pub fn remove(&mut self, device: Device) {
         self.devices.retain(|d| !device.ids().contains(d))

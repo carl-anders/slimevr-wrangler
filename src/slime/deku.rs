@@ -27,7 +27,7 @@ impl From<SlimeQuaternion> for Quaternion<f64> {
     }
 }
 
-#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[derive(PartialEq, Eq, Debug, DekuRead, DekuWrite)]
 #[deku(endian = "endian", ctx = "endian: deku::ctx::Endian")]
 pub struct SlimeString {
     #[deku(update = "self.data.len()")]

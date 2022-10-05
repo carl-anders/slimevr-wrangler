@@ -159,7 +159,7 @@ impl Application for MainState {
             }
             Message::JoyconRotate(serial_number, direction) => {
                 self.settings.change(|ws| {
-                    ws.joycon_rotation_add(serial_number, if direction { 90 } else { -90 })
+                    ws.joycon_rotation_add(serial_number, if direction { 90 } else { -90 });
                 });
             }
             Message::JoyconScale(serial_number, scale) => {
