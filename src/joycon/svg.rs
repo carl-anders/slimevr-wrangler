@@ -1,11 +1,16 @@
 use iced::{svg::Handle, Svg};
-use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::{
+        hash_map::Entry::{Occupied, Vacant},
+        HashMap,
+    },
+};
 
 static LEFT: &str = include_str!("../../assets/joycon-left.svg");
 static RIGHT: &str = include_str!("../../assets/joycon-right.svg");
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum JoyconDesignType {
     Left,
     Right,
@@ -16,36 +21,34 @@ pub struct JoyconDesign {
     pub color: String,
     pub design_type: JoyconDesignType,
 }
-pub struct JoyconSvg {
-    map: HashMap<(JoyconDesign, i32), Svg>,
-}
-impl Default for JoyconSvg {
-    fn default() -> Self {
-        Self::new()
+
+fn generate(design: &JoyconDesign, rotation: i32) -> Svg {
+    let svg_code = match design.design_type {
+        JoyconDesignType::Left => LEFT,
+        JoyconDesignType::Right => RIGHT,
     }
+    .replace("#3fa9f5", &design.color)
+    .replace("rotate(0", &format!("rotate({:}", (rotation + 90) % 360));
+    // Rotation is how many degrees clockwise joycons are rotated from their "starting position".
+    // Left starts with rail down. Right starts with rail up.
+    // The svg's are not consistent with that so needs to be rotated an extra 90 degrees.
+    Svg::new(Handle::from_memory(svg_code))
+}
+
+#[derive(Default, Clone)]
+pub struct JoyconSvg {
+    map: RefCell<HashMap<(JoyconDesign, i32), Svg>>,
 }
 impl JoyconSvg {
     pub fn new() -> Self {
         Self {
-            map: HashMap::new(),
+            map: RefCell::new(HashMap::new()),
         }
     }
-    pub fn get(&mut self, design: &JoyconDesign, rotation: i32) -> &Svg {
-        match self.map.entry((design.clone(), rotation)) {
-            Occupied(entry) => entry.into_mut(),
-            Vacant(entry) => {
-                let svg_code = match design.design_type {
-                    JoyconDesignType::Left => LEFT,
-                    JoyconDesignType::Right => RIGHT,
-                }
-                .replace("#3fa9f5", &design.color)
-                .replace("rotate(0", &format!("rotate({:}", (rotation + 90) % 360));
-                // Rotation is how many degrees clockwise joycons are rotated from their "starting position".
-                // Left starts with rail down. Right starts with rail up.
-                // The svg's are not consistent with that so needs to be rotated an extra 90 degrees.
-
-                entry.insert(Svg::new(Handle::from_memory(svg_code)))
-            }
+    pub fn get(&self, design: &JoyconDesign, rotation: i32) -> Svg {
+        match self.map.borrow_mut().entry((design.clone(), rotation)) {
+            Occupied(entry) => entry.get().clone(),
+            Vacant(entry) => entry.insert(generate(design, rotation)).clone(),
         }
     }
 }
