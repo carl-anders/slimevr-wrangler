@@ -7,6 +7,7 @@ use communication::*;
 
 mod integration;
 use integration::spawn_thread;
+mod test_integration;
 
 mod wrapper;
 pub use wrapper::*;
