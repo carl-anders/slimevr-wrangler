@@ -7,6 +7,7 @@ use std::{
 };
 
 use deku::{DekuContainerRead, DekuContainerWrite};
+use itertools::Itertools;
 use nalgebra::{UnitQuaternion, Vector3};
 
 use crate::{settings, slime::deku::PacketType};
@@ -172,7 +173,7 @@ pub fn main_thread(
         if !connected && last_handshake.elapsed().as_secs() >= 3 {
             last_handshake = Instant::now();
             slime_handshake(&socket, &address);
-            for device in devices.values() {
+            for device in devices.values().sorted_by_key(|d| d.id) {
                 device.handshake(&socket, &address);
             }
         }
