@@ -17,10 +17,10 @@ directories = "4.0"
 self_update = { version = "0.32", features = ["archive-zip", "compression-zip-deflate"] }
 itertools = "0.10"
 nalgebra = "0.30"
-deku = "0.13"
+deku = "0.15"
 md-5 = "0.10"
 arc-swap = "1.5"
-vqf-cxx = { git = "https://github.com/carl-anders/vqf-cxx", version = "0.1" }
+vqf-cxx = { git = "https://github.com/carl-anders/vqf-cxx" }
 keyvalues-parser = "0.1.0"
 regex = "1.6"
 thiserror = "1.0"
