@@ -154,6 +154,7 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelInfo>, settings: settings::Handler) 
             Err(_) => return,
         }
     };
+    #[allow(clippy::let_unit_value)]
     let _drop = devices.iter().for_each(|d| {
         let tx = tx.clone();
         let settings = settings.clone();

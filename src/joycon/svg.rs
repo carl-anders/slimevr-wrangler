@@ -1,4 +1,4 @@
-use iced::{svg::Handle, Svg};
+use iced::widget::{svg::Handle, Svg};
 use std::{
     cell::RefCell,
     collections::{
@@ -32,7 +32,7 @@ fn generate(design: &JoyconDesign, rotation: i32) -> Svg {
     // Rotation is how many degrees clockwise joycons are rotated from their "starting position".
     // Left starts with rail down. Right starts with rail up.
     // The svg's are not consistent with that so needs to be rotated an extra 90 degrees.
-    Svg::new(Handle::from_memory(svg_code))
+    Svg::new(Handle::from_memory(svg_code.as_bytes().to_vec()))
 }
 
 #[derive(Default, Clone)]

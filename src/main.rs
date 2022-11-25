@@ -2,13 +2,13 @@
 
 use iced::{
     executor,
-    pure::{
-        button, column, container, horizontal_space, row, scrollable, slider, text, text_input,
-        vertical_space,
-        widget::{Column, Container, Row, Scrollable},
-        Application, Element,
+    theme::{self, Theme},
+    time,
+    widget::{
+        button, container, horizontal_space, scrollable, slider, text, text_input, vertical_space,
+        Column, Container, Row, Scrollable, Svg,
     },
-    time, window, Alignment, Command, Font, Length, Settings, Subscription, Svg,
+    window, Alignment, Application, Command, Element, Font, Length, Settings, Subscription,
 };
 use itertools::Itertools;
 use std::{
@@ -77,6 +77,7 @@ impl Application for MainState {
     type Executor = executor::Default;
     type Flags = ();
     type Message = Message;
+    type Theme = Theme;
 
     fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
         (
@@ -94,6 +95,9 @@ impl Application for MainState {
 
     fn title(&self) -> String {
         String::from("SlimeVR Wrangler")
+    }
+    fn theme(&self) -> Theme {
+        Theme::Dark
     }
 
     fn update(&mut self, message: Message) -> Command<Self::Message> {
@@ -176,7 +180,7 @@ impl Application for MainState {
     fn view(&self) -> Element<Message> {
         let mut main_container;
         if self.settings_show {
-            let mut all_settings = column()
+            let mut all_settings = Column::new()
                 .spacing(20)
                 .push(address(&self.settings.load().address));
             if self.joycon.is_some() {
@@ -197,11 +201,14 @@ impl Application for MainState {
                         .settings
                         .load()
                         .joycon_scale_get(&joycon_box.status.serial_number);
-                    boxes.push(contain(joycon_box.view(svg, scale)).style(style::Item::Normal));
+                    boxes.push(
+                        contain(joycon_box.view(svg, scale))
+                            .style(style::item_normal as for<'r> fn(&'r _) -> _),
+                    );
                 }
                 boxes.push(
                     contain(
-                    column()
+                        Column::new()
                         .push(
                             text(format!(
                                 "Looking for Joycon controllers{}\n\n\
@@ -210,15 +217,20 @@ impl Application for MainState {
                             ))
                         )
                         .align_items(Alignment::Center),
-                    ).style(style::Item::Special)
+                    ).style(style::item_special as for<'r> fn(&'r _) -> _)
                 );
             } else {
-                let feature_enabler = column().spacing(10).push(text("Add new trackers")).push(
-                    button(text("Search for Joy-Con's"))
-                        .on_press(Message::EnableJoyconsPressed)
-                        .style(style::Button::Primary),
+                let feature_enabler = Column::new()
+                    .spacing(10)
+                    .push(text("Add new trackers"))
+                    .push(
+                        button(text("Search for Joy-Con's"))
+                            .on_press(Message::EnableJoyconsPressed)
+                            .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
+                    );
+                boxes.push(
+                    contain(feature_enabler).style(style::item_special as for<'r> fn(&'r _) -> _),
                 );
-                boxes.push(contain(feature_enabler).style(style::Item::Special));
             }
 
             let list = float_list(self.num_columns, boxes);
@@ -229,11 +241,11 @@ impl Application for MainState {
         main_container = main_container
             .width(Length::Fill)
             .height(Length::Fill)
-            .style(style::Background::Darker);
+            .style(style::container_darker as for<'r> fn(&'r _) -> _);
 
         let top_bar = top_bar(self.update_found.clone());
 
-        let mut app = column().push(top_bar);
+        let mut app = Column::new().push(top_bar);
         if self.blacklist_info.visible() {
             app = app.push(blacklist_bar(&self.blacklist_info));
         }
@@ -251,9 +263,9 @@ where
         .padding(10)
 }
 fn float_list(columns: usize, boxes: Vec<Container<'_, Message>>) -> Scrollable<'_, Message> {
-    let mut list = column().padding(20).spacing(20).width(Length::Fill);
+    let mut list = Column::new().padding(20).spacing(20).width(Length::Fill);
     for chunk in &boxes.into_iter().chunks(columns) {
-        let mut row: Row<Message> = row().spacing(20);
+        let mut row: Row<Message> = Row::new().spacing(20);
 
         for bax in chunk {
             row = row.push(bax);
@@ -268,7 +280,7 @@ fn address<'a>(input_value: &str) -> Column<'a, Message> {
         .width(Length::Units(500))
         .padding(10);
 
-    let mut allc = column().spacing(10).push(address_info).push(address);
+    let mut allc = Column::new().spacing(10).push(address_info).push(address);
 
     if input_value.parse::<SocketAddr>().is_ok() {
         allc = allc.push(vertical_space(Length::Units(20)));
@@ -280,13 +292,13 @@ fn address<'a>(input_value: &str) -> Column<'a, Message> {
     allc
 }
 fn top_bar<'a>(update: Option<String>) -> Container<'a, Message> {
-    let mut top_column = row()
+    let mut top_column = Row::new()
         .align_items(Alignment::Center)
         .push(text("SlimeVR Wrangler").size(24));
 
     if let Some(u) = update {
         let update_btn = button(text("Update"))
-            .style(style::Button::Primary)
+            .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
             .on_press(Message::UpdatePressed);
         top_column = top_column
             .push(horizontal_space(Length::Units(20)))
@@ -295,7 +307,7 @@ fn top_bar<'a>(update: Option<String>) -> Container<'a, Message> {
     }
 
     let settings = button(text("Settings"))
-        .style(style::Settings::Primary)
+        .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
         .on_press(Message::SettingsPressed);
     top_column = top_column
         .push(horizontal_space(Length::Fill))
@@ -304,25 +316,25 @@ fn top_bar<'a>(update: Option<String>) -> Container<'a, Message> {
     container(top_column)
         .width(Length::Fill)
         .padding(20)
-        .style(style::Background::Highlight)
+        .style(style::container_highlight as for<'r> fn(&'r _) -> _)
 }
 
 fn blacklist_bar<'a>(result: &blacklist::BlacklistResult) -> Container<'a, Message> {
-    let mut row = row()
+    let mut row = Row::new()
         .align_items(Alignment::Center)
         .push(text(result.info.clone()))
         .push(horizontal_space(Length::Units(20)));
     if result.fix_button {
         row = row.push(
             button(text("Fix blacklist"))
-                .style(style::Button::Primary)
+                .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
                 .on_press(Message::BlacklistFixPressed),
         );
     }
     container(row)
         .width(Length::Fill)
         .padding(20)
-        .style(style::Background::Info)
+        .style(style::container_info as for<'r> fn(&'r _) -> _)
 }
 
 #[derive(Debug, Clone)]
@@ -337,27 +349,27 @@ impl JoyconBox {
     fn view(&self, svg: Svg, scale: f64) -> Column<Message> {
         let sn = self.status.serial_number.clone();
 
-        let buttons = row()
+        let buttons = Row::new()
             .spacing(10)
             .push(
                 button(text("↺").font(ICONS))
                     .on_press(Message::JoyconRotate(sn.clone(), false))
-                    .style(style::Button::Primary),
+                    .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
             )
             .push(
                 button(text("↻").font(ICONS))
                     .on_press(Message::JoyconRotate(sn.clone(), true))
-                    .style(style::Button::Primary),
+                    .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
             );
 
-        let left = column()
+        let left = Column::new()
             .spacing(10)
             .align_items(Alignment::Center)
             .push(buttons)
             .push(svg)
             .width(Length::Units(150));
 
-        let top = row()
+        let top = Row::new()
             .spacing(10)
             .push(left)
             .push(text(format!(
@@ -366,7 +378,7 @@ impl JoyconBox {
             )))
             .height(Length::Units(160));
 
-        let bottom = column()
+        let bottom = Column::new()
             .spacing(10)
             .push(
                 slider(0.8..=1.2, scale, move |c| {
@@ -377,6 +389,6 @@ impl JoyconBox {
             .push(text(format!("Rotation scale ratio: {:.3}", scale)))
             .push(text("Change this if the tracker in vr moves less or more than your irl joycon. Higher value = more movement.").size(14));
 
-        column().spacing(10).push(top).push(bottom)
+        Column::new().spacing(10).push(top).push(bottom)
     }
 }
