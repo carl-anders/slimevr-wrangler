@@ -1,4 +1,9 @@
+<div align="center">
+
 # SlimeVR Wrangler
+
+[![Discord Server](https://img.shields.io/discord/817184208525983775?color=7389D8&label=Discord%20&logo=discord&logoColor=FFFFFF)](https://discord.gg/slimevr)
+</div>
 
 Use Joy-Con's as SlimeVR trackers, enabling you to make a full body system with your existing devices. Combine with DIY SlimeVR trackers, or phones using owoTrack.
 
