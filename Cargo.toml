@@ -20,7 +20,7 @@ nalgebra = "0.30"
 deku = "0.15"
 md-5 = "0.10"
 arc-swap = "1.5"
-vqf-cxx = { git = "https://github.com/carl-anders/vqf-cxx" }
+vqf-cxx = { git = "https://github.com/carl-anders/vqf-cxx", branch = "fix-macos-compilation" }
 keyvalues-parser = "0.1.0"
 regex = "1.6"
 thiserror = "1.0"
