@@ -1,4 +1,4 @@
-use iced::widget::{svg::Handle, Svg};
+use iced::widget::svg::Handle;
 use std::{
     cell::RefCell,
     collections::{
@@ -22,7 +22,7 @@ pub struct JoyconDesign {
     pub design_type: JoyconDesignType,
 }
 
-fn generate(design: &JoyconDesign, rotation: i32) -> Svg {
+fn generate(design: &JoyconDesign, rotation: i32) -> Handle {
     let svg_code = match design.design_type {
         JoyconDesignType::Left => LEFT,
         JoyconDesignType::Right => RIGHT,
@@ -32,12 +32,12 @@ fn generate(design: &JoyconDesign, rotation: i32) -> Svg {
     // Rotation is how many degrees clockwise joycons are rotated from their "starting position".
     // Left starts with rail down. Right starts with rail up.
     // The svg's are not consistent with that so needs to be rotated an extra 90 degrees.
-    Svg::new(Handle::from_memory(svg_code.as_bytes().to_vec()))
+    Handle::from_memory(svg_code.as_bytes().to_vec())
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct JoyconSvg {
-    map: RefCell<HashMap<(JoyconDesign, i32), Svg>>,
+    map: RefCell<HashMap<(JoyconDesign, i32), Handle>>,
 }
 impl JoyconSvg {
     pub fn new() -> Self {
@@ -45,7 +45,7 @@ impl JoyconSvg {
             map: RefCell::new(HashMap::new()),
         }
     }
-    pub fn get(&self, design: &JoyconDesign, rotation: i32) -> Svg {
+    pub fn get(&self, design: &JoyconDesign, rotation: i32) -> Handle {
         match self.map.borrow_mut().entry((design.clone(), rotation)) {
             Occupied(entry) => entry.get().clone(),
             Vacant(entry) => entry.insert(generate(design, rotation)).clone(),

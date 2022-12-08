@@ -12,8 +12,12 @@ use iced::{
 };
 use itertools::Itertools;
 use std::{
+    io::{
+        self,
+        prelude::{Read, Write},
+    },
     net::SocketAddr,
-    time::{Duration, Instant}, io::{self, prelude::{Read, Write}},
+    time::{Duration, Instant},
 };
 mod joycon;
 mod steam_blacklist;
@@ -42,16 +46,14 @@ pub fn main() -> iced::Result {
         ..Settings::default()
     };
     match MainState::run(settings) {
-        Ok(a) => {
-            Ok(a)
-        },
+        Ok(a) => Ok(a),
         Err(e) => {
             println!("{:?}", e);
             print!("Press enter to continue...");
             io::stdout().flush().unwrap();
             let _ = io::stdin().read(&mut [0u8]).unwrap();
             Err(e)
-        },
+        }
     }
 }
 
@@ -205,15 +207,12 @@ impl Application for MainState {
 
             if self.joycon.is_some() {
                 for joycon_box in &self.joycon_boxes {
-                    let svg = self
-                        .joycon_svg
-                        .get(&joycon_box.status.design, joycon_box.status.mount_rotation);
                     let scale = self
                         .settings
                         .load()
                         .joycon_scale_get(&joycon_box.status.serial_number);
                     boxes.push(
-                        contain(joycon_box.view(svg, scale))
+                        contain(joycon_box.view(&self.joycon_svg, scale))
                             .style(style::item_normal as for<'r> fn(&'r _) -> _),
                     );
                 }
@@ -357,7 +356,7 @@ impl JoyconBox {
     fn new(status: JoyconStatus) -> Self {
         Self { status }
     }
-    fn view(&self, svg: Svg, scale: f64) -> Column<Message> {
+    fn view(&self, svg_handler: &JoyconSvg, scale: f64) -> Column<Message> {
         let sn = self.status.serial_number.clone();
 
         let buttons = Row::new()
@@ -372,6 +371,8 @@ impl JoyconBox {
                     .on_press(Message::JoyconRotate(sn.clone(), true))
                     .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
             );
+
+        let svg = Svg::new(svg_handler.get(&self.status.design, self.status.mount_rotation));
 
         let left = Column::new()
             .spacing(10)
