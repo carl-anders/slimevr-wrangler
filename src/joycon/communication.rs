@@ -100,12 +100,10 @@ fn parse_message(
                 }
 
                 let joycon_rotation = settings.joycon_rotation_get(&data.serial_number);
+                let rad_rotation = (joycon_rotation as f64).to_radians();
                 let rotated_quat = if joycon_rotation > 0 {
                     device.imu.rotation
-                        * UnitQuaternion::from_axis_angle(
-                            &Vector3::z_axis(),
-                            joycon_rotation as f64 * (std::f64::consts::TAU / 360.0),
-                        )
+                        * UnitQuaternion::from_axis_angle(&Vector3::z_axis(), rad_rotation)
                 } else {
                     device.imu.rotation
                 };
@@ -120,8 +118,54 @@ fn parse_message(
                 socket
                     .send_to(&rotation_packet.to_bytes().unwrap(), address)
                     .unwrap();
+
+                let acc = calc_acceleration(device.imu.rotation, &data.imu_data[2], rad_rotation);
+                if std::env::args().any(|a| &a == "debug") {
+                    println!("x: {:.3}, y: {:.3}, z: {:.3}", acc.x, acc.y, acc.z);
+                }
+
+                let acceleration_packet = PacketType::Acceleration {
+                    packet_id: 0,
+                    vector: (acc.x as f32, acc.y as f32, acc.z as f32),
+                    sensor_id: Some(device.id),
+                };
+                socket
+                    .send_to(&acceleration_packet.to_bytes().unwrap(), address)
+                    .unwrap();
             }
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct Xyz {
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+fn calc_acceleration(
+    rotation: UnitQuaternion<f64>,
+    axisdata: &JoyconAxisData,
+    rad_rotation: f64,
+) -> Xyz {
+    let a = rotation.coords;
+    let (x, y, z, w) = (a.x, a.y, a.z, a.w);
+    let gravity = [
+        2.0 * ((-x) * (-z) - w * y),
+        -2.0 * (w * (-x) + y * (-z)),
+        w * w - x * x - y * y + z * z,
+    ];
+    let vector = Xyz {
+        x: axisdata.accel_x - gravity[0],
+        y: axisdata.accel_y - gravity[1],
+        z: axisdata.accel_z - gravity[2],
+    };
+
+    Xyz {
+        x: vector.x * rad_rotation.cos() - vector.y * rad_rotation.sin(),
+        y: vector.x * rad_rotation.sin() + vector.y * rad_rotation.cos(),
+        z: vector.z,
     }
 }
 

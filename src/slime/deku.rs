@@ -71,6 +71,12 @@ pub enum PacketType {
         firmware: SlimeString,
         mac_address: [u8; 6],
     },
+    #[deku(id = "4")]
+    Acceleration {
+        packet_id: u64,
+        vector: (f32, f32, f32),
+        sensor_id: Option<u8>,
+    },
     #[deku(id = "10")]
     Ping { id: u32 },
     #[deku(id = "15")]

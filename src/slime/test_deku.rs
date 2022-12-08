@@ -2,14 +2,11 @@
 mod tests {
     use crate::slime::deku::PacketType;
     use deku::{DekuContainerRead, DekuContainerWrite};
-    use md5::{Digest, Md5};
     use nalgebra::{Quaternion, UnitQuaternion};
 
     #[test]
     fn handshake() {
-        let mut hasher = Md5::new();
-        hasher.update(b"This is a joycon serial number");
-        let mac: [u8; 6] = hasher.finalize()[0..6].try_into().unwrap();
+        let mac: [u8; 6] = [121, 34, 164, 250, 231, 204]; // test mac
         let handshake = PacketType::Handshake {
             packet_id: 1,
             board: 2,
@@ -79,5 +76,17 @@ mod tests {
 
         let ping = PacketType::Ping { id: 16909060 };
         assert_eq!(result, ping);
+    }
+    #[test]
+    fn test_acceleration() {
+        let acc = PacketType::Acceleration {
+            packet_id: 16,
+            vector: (0.1, 0.5, 0.9),
+            sensor_id: Some(32),
+        };
+
+        let data: Vec<u8> = vec![0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 16, 61, 204, 204, 205, 63, 0, 0, 0, 63, 102, 102, 102, 32];
+
+        assert_eq!(acc.to_bytes().unwrap(), data);
     }
 }

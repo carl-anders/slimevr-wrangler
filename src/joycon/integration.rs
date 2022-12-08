@@ -24,7 +24,7 @@ fn gyro(n: i16, offset: i16, scale: f64) -> f64 {
     // NOTE: 13371 is technically a value present in flash, in practice it seems to be constant.
     //* (936.0 / (13371 - offset) as f64) // to degrees/s
     * 0.07000839246f64 // 4588/65535 - degrees/s
-    * (std::f64::consts::PI / 180.0f64) // radians/s
+    .to_radians() // radians/s
 }
 
 fn joycon_listen_loop(

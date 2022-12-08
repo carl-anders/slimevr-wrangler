@@ -1,10 +1,6 @@
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 use vqf_cxx::{VQFBuilder, VQF};
 
-fn deg(r: f64) -> f64 {
-    r * (180.0f64 / std::f64::consts::PI)
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JoyconAxisData {
     pub accel_x: f64,
@@ -38,6 +34,6 @@ impl Imu {
     // euler_angles: roll, pitch, yaw
     pub fn euler_angles_deg(&self) -> (f64, f64, f64) {
         let ea = self.rotation.euler_angles();
-        (deg(ea.0), deg(ea.1), deg(ea.2))
+        (ea.0.to_degrees(), ea.1.to_degrees(), ea.2.to_degrees())
     }
 }
