@@ -13,7 +13,7 @@ use iced::{
 use itertools::Itertools;
 use std::{
     net::SocketAddr,
-    time::{Duration, Instant},
+    time::{Duration, Instant}, io::{self, prelude::{Read, Write}},
 };
 mod joycon;
 mod steam_blacklist;
@@ -41,7 +41,18 @@ pub fn main() -> iced::Result {
         antialiasing: true,
         ..Settings::default()
     };
-    MainState::run(settings)
+    match MainState::run(settings) {
+        Ok(a) => {
+            Ok(a)
+        },
+        Err(e) => {
+            println!("{:?}", e);
+            print!("Press enter to continue...");
+            io::stdout().flush().unwrap();
+            let _ = io::stdin().read(&mut [0u8]).unwrap();
+            Err(e)
+        },
+    }
 }
 
 #[derive(Debug, Clone)]
