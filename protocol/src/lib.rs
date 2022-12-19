@@ -5,7 +5,6 @@ pub use deku;
 use std::string::FromUtf8Error;
 
 use deku::prelude::*;
-use nalgebra::Quaternion;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "endian", ctx = "endian: deku::ctx::Endian")]
@@ -15,19 +14,46 @@ pub struct SlimeQuaternion {
     pub k: f32,
     pub w: f32,
 }
-impl From<Quaternion<f64>> for SlimeQuaternion {
-    fn from(q: Quaternion<f64>) -> Self {
-        Self {
-            i: q.i as _,
-            j: q.j as _,
-            k: q.k as _,
-            w: q.w as _,
+#[cfg(feature = "nalgebra031")]
+mod nalgebra031_impls {
+    use super::*;
+    use nalgebra031::Quaternion;
+
+    impl From<Quaternion<f64>> for SlimeQuaternion {
+        fn from(q: Quaternion<f64>) -> Self {
+            Self {
+                i: q.i as _,
+                j: q.j as _,
+                k: q.k as _,
+                w: q.w as _,
+            }
+        }
+    }
+    impl From<SlimeQuaternion> for Quaternion<f64> {
+        fn from(q: SlimeQuaternion) -> Self {
+            Self::new(q.w as _, q.i as _, q.j as _, q.k as _)
         }
     }
 }
-impl From<SlimeQuaternion> for Quaternion<f64> {
-    fn from(q: SlimeQuaternion) -> Self {
-        Self::new(q.w as _, q.i as _, q.j as _, q.k as _)
+#[cfg(feature = "nalgebra030")]
+mod nalgebra030_impls {
+    use super::*;
+    use nalgebra030::Quaternion;
+
+    impl From<Quaternion<f64>> for SlimeQuaternion {
+        fn from(q: Quaternion<f64>) -> Self {
+            Self {
+                i: q.i as _,
+                j: q.j as _,
+                k: q.k as _,
+                w: q.w as _,
+            }
+        }
+    }
+    impl From<SlimeQuaternion> for Quaternion<f64> {
+        fn from(q: SlimeQuaternion) -> Self {
+            Self::new(q.w as _, q.i as _, q.j as _, q.k as _)
+        }
     }
 }
 
