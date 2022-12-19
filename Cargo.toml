@@ -22,7 +22,7 @@ self_update = { version = "0.32", features = [
 	"archive-zip",
 	"compression-zip-deflate",
 ] }
-protocol = { path = "protocol" }
+protocol = { path = "protocol", features = ["nalgebra030"] }
 itertools = "0.10"
 nalgebra = "0.30"
 arc-swap = "1.5"

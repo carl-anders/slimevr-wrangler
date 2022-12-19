@@ -6,4 +6,6 @@ edition = "2021"
 
 [dependencies]
 deku = "0.15"
-nalgebra = "0.30"
+# We support multiple versions of nalgebra since it changes so much.
+nalgebra031 = { package = "nalgebra", version = "0.31", optional = true }
+nalgebra030 = { package = "nalgebra", version = "0.30", optional = true }
