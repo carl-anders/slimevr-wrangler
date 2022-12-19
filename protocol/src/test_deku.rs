@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use crate::slime::deku::PacketType;
     use deku::{DekuContainerRead, DekuContainerWrite};
     use nalgebra::{Quaternion, UnitQuaternion};
+
+    use crate::PacketType;
 
     #[test]
     fn handshake() {
@@ -85,7 +86,10 @@ mod tests {
             sensor_id: Some(32),
         };
 
-        let data: Vec<u8> = vec![0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 16, 61, 204, 204, 205, 63, 0, 0, 0, 63, 102, 102, 102, 32];
+        let data: Vec<u8> = vec![
+            0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 16, 61, 204, 204, 205, 63, 0, 0, 0, 63, 102, 102, 102,
+            32,
+        ];
 
         assert_eq!(acc.to_bytes().unwrap(), data);
     }

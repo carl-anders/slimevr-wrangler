@@ -2940,6 +2940,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74605f360ce573babfe43964cbe520294dcb081afbf8c108fc6e23036b4da2df"
 
 [[package]]
+name = "protocol"
+version = "0.0.0"
+dependencies = [
+ "deku",
+ "nalgebra",
+]
+
+[[package]]
 name = "quick-xml"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3467,7 +3475,6 @@ version = "0.7.1"
 dependencies = [
  "arc-swap",
  "async-std",
- "deku",
  "directories",
  "iced",
  "iced_native",
@@ -3475,6 +3482,7 @@ dependencies = [
  "joycon-rs",
  "keyvalues-parser",
  "nalgebra",
+ "protocol",
  "regex",
  "self_update",
  "serde",

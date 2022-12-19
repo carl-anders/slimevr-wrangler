@@ -24,7 +24,6 @@ mod steam_blacklist;
 use crate::joycon::{JoyconIntegration, JoyconStatus, JoyconSvg};
 use steam_blacklist as blacklist;
 mod settings;
-mod slime;
 mod style;
 mod update;
 

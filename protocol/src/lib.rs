@@ -1,3 +1,7 @@
+mod test_deku;
+
+pub use deku;
+
 use std::string::FromUtf8Error;
 
 use deku::prelude::*;
