@@ -6,16 +6,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-use deku::{DekuContainerRead, DekuContainerWrite};
 use itertools::Itertools;
 use nalgebra::{UnitQuaternion, Vector3};
-
-use crate::{settings, slime::deku::PacketType};
+use protocol::deku::{DekuContainerRead, DekuContainerWrite};
+use protocol::PacketType;
 
 use super::{
     imu::{Imu, JoyconAxisData},
     JoyconDesign,
 };
+use crate::settings;
 
 #[derive(Debug, Clone)]
 pub struct JoyconStatus {

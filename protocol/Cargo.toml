@@ -1,0 +1,9 @@
+[package]
+name = "protocol"
+version = "0.0.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+
+[dependencies]
+deku = "0.15"
+nalgebra = "0.30"
