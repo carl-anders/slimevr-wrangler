@@ -11,7 +11,7 @@ Use Joy-Con's as SlimeVR trackers, enabling you to make a full body system with 
 
 ## Setup
 You need bluetooth on your computer.
-* Download and set up [SlimeVR](https://docs.slimevr.dev/slimevr-setup.html)
+* Download and set up [SlimeVR](https://docs.slimevr.dev/server-setup/initial-setup.html)
 * Download [SlimeVR Wrangler](https://github.com/carl-anders/slimevr-wrangler/releases/latest/download/slimevr-wrangler.exe)
 * Start both the SlimeVR server and SlimeVR Wrangler 
 * Connect your Joy-Con trackers to the computer ([Guide for Windows](https://www.digitaltrends.com/gaming/how-to-connect-a-nintendo-switch-controller-to-a-pc/))
