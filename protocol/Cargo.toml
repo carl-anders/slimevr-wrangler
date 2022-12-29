@@ -4,6 +4,9 @@ version = "0.0.0"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 
+[features]
+default = ["nalgebra031"]
+
 [dependencies]
 deku = "0.15"
 # We support multiple versions of nalgebra since it changes so much.

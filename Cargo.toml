@@ -24,9 +24,9 @@ self_update = { version = "0.32", features = [
 ] }
 protocol = { path = "protocol", features = ["nalgebra030"] }
 itertools = "0.10"
-nalgebra = "0.30"
+nalgebra = "0.31"
 arc-swap = "1.5"
-vqf-cxx = { git = "https://github.com/carl-anders/vqf-cxx" }
+vqf-cxx = { git = "https://github.com/carl-anders/vqf-cxx", branch = "nalgebra-0.31" }
 keyvalues-parser = "0.1.0"
 regex = "1.6"
 thiserror = "1.0"
