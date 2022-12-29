@@ -8,9 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        export DEBIAN_FRONTED=noninteractive
+        sudo apt-get -qq update
+        sudo apt-get install -y libxkbcommon-dev libudev-dev build-essential linux-tools-common pkg-config libssl-dev libusb-1.0-0-dev clang
     - name: Build ubuntu binary
-      env:
-        MACOSX_DEPLOYMENT_TARGET: 10.14
       run: cargo build --verbose --release
     - name: Open binary via double-click
       run: chmod +x target/release/slimevr-wrangler
