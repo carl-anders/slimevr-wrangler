@@ -2,7 +2,7 @@ name: Build
 on:
   push:
     branches:
-      - actions-test
+      - main
 jobs:
   build_windows:
     runs-on: windows-latest
@@ -32,6 +32,25 @@ jobs:
     - name: Open binary via double-click
       run: chmod +x target/release/slimevr-wrangler
     - name: Archive mac binary
+      uses: actions/upload-artifact@v1
+      with:
+        name: slimevr-wrangler
+        path: target/release/slimevr-wrangler
+
+  build_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        export DEBIAN_FRONTED=noninteractive
+        sudo apt-get -qq update
+        sudo apt-get install -y libxkbcommon-dev libudev-dev build-essential linux-tools-common pkg-config libssl-dev libusb-1.0-0-dev clang
+    - name: Build ubuntu binary
+      run: cargo build --verbose --release
+    - name: Open binary via double-click
+      run: chmod +x target/release/slimevr-wrangler
+    - name: Archive ubuntu binary
       uses: actions/upload-artifact@v1
       with:
         name: slimevr-wrangler
