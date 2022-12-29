@@ -34,7 +34,7 @@ jobs:
     - name: Archive mac binary
       uses: actions/upload-artifact@v1
       with:
-        name: slimevr-wrangler
+        name: slimevr-wrangler-macos
         path: target/release/slimevr-wrangler
 
   build_ubuntu:
@@ -53,5 +53,5 @@ jobs:
     - name: Archive ubuntu binary
       uses: actions/upload-artifact@v1
       with:
-        name: slimevr-wrangler
+        name: slimevr-wrangler-ubuntu
         path: target/release/slimevr-wrangler
