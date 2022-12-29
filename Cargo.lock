@@ -3580,7 +3580,7 @@ dependencies = [
 
 [[package]]
 name = "slimevr-wrangler"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "arc-swap",
  "async-std",
