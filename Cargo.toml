@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-iced = { version = "0.6", features = ["async-std", "svg", "wgpu"] }
+iced = { version = "0.6", features = ["async-std", "svg", "glow"] }
 iced_native = "0.7"
 async-std = "1.0"
 joycon-rs = { git = "https://github.com/carl-anders/joycon-rs" }
