@@ -2,8 +2,7 @@
 mod imu;
 
 mod communication;
-pub use communication::JoyconStatus;
-use communication::*;
+pub use communication::*;
 
 mod integration;
 use integration::spawn_thread;

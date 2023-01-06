@@ -1,4 +1,6 @@
-use std::{collections::HashMap, fs, fs::File, io::BufReader, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap, fs, fs::File, io::BufReader, net::SocketAddr, path::PathBuf, sync::Arc,
+};
 
 use arc_swap::{ArcSwap, Guard};
 use directories::ProjectDirs;
@@ -62,6 +64,12 @@ impl WranglerSettings {
         self.joycon
             .get(serial_number)
             .map_or(1.0, |j| j.gyro_scale_factor)
+    }
+    pub fn get_socket_address(&self) -> SocketAddr {
+        self.address
+            .clone()
+            .parse::<SocketAddr>()
+            .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap())
     }
 }
 impl Default for WranglerSettings {

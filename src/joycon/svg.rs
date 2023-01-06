@@ -36,10 +36,10 @@ fn generate(design: &JoyconDesign, rotation: i32) -> Handle {
 }
 
 #[derive(Default, Clone, Debug)]
-pub struct JoyconSvg {
+pub struct Svg {
     map: RefCell<HashMap<(JoyconDesign, i32), Handle>>,
 }
-impl JoyconSvg {
+impl Svg {
     pub fn new() -> Self {
         Self {
             map: RefCell::new(HashMap::new()),

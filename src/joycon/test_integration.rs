@@ -1,20 +1,22 @@
 use std::{sync::mpsc, thread, time::Duration};
 
+use joycon_rs::prelude::input_report_mode::BatteryLevel;
+
 use super::{
-    communication::{ChannelInfo, JoyconData, JoyconDeviceInfo},
+    communication::{ChannelData, ChannelInfo},
     imu::JoyconAxisData,
     JoyconDesign, JoyconDesignType,
 };
 
-fn spawn_test(tx: mpsc::Sender<ChannelInfo>, color: String, sn: String, z_change: f64) {
-    let iinfo = JoyconDeviceInfo {
+fn spawn_test(tx: mpsc::Sender<ChannelData>, color: String, sn: String, z_change: f64) {
+    tx.send(ChannelData {
         serial_number: sn.clone(),
-        design: JoyconDesign {
+        info: ChannelInfo::Connected(JoyconDesign {
             color,
             design_type: JoyconDesignType::Left,
-        },
-    };
-    tx.send(ChannelInfo::Connected(iinfo)).unwrap();
+        }),
+    })
+    .unwrap();
 
     loop {
         let d = JoyconAxisData {
@@ -25,11 +27,18 @@ fn spawn_test(tx: mpsc::Sender<ChannelInfo>, color: String, sn: String, z_change
             gyro_y: 0.0,
             gyro_z: z_change,
         };
-        let data = JoyconData {
+        tx.send(ChannelData {
             serial_number: sn.clone(),
-            imu_data: [d, d, d],
-        };
-        tx.send(ChannelInfo::Data(data)).unwrap();
+            info: ChannelInfo::ImuData([d, d, d]),
+        })
+        .unwrap();
+
+        tx.send(ChannelData {
+            serial_number: sn.clone(),
+            info: ChannelInfo::BatteryLevel(BatteryLevel::Medium),
+        })
+        .unwrap();
+
         thread::sleep(Duration::from_millis(16));
         if d.accel_x > 1.0 {
             break;
@@ -37,7 +46,7 @@ fn spawn_test(tx: mpsc::Sender<ChannelInfo>, color: String, sn: String, z_change
     }
 }
 
-pub fn test_controllers(tx: mpsc::Sender<ChannelInfo>) {
+pub fn test_controllers(tx: mpsc::Sender<ChannelData>) {
     let controllers = vec![
         ("#aacc20", "test_0", 0.05),
         ("#aa20cc", "test_1", 0.04),

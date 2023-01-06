@@ -5,12 +5,16 @@ use iced::{
     theme::{self, Theme},
     time,
     widget::{
-        button, container, horizontal_space, scrollable, slider, text, text_input, vertical_space,
-        Column, Container, Row, Scrollable, Svg,
+        button, container, horizontal_space, scrollable, slider, text, text_input, Column,
+        Container, Row, Svg,
     },
-    window, Alignment, Application, Command, Element, Font, Length, Settings, Subscription,
+    window,
+    Alignment, Application, Command, Element, Font, Length, Settings, Subscription,
 };
+
 use itertools::Itertools;
+use joycon::ServerStatus;
+use joycon_rs::prelude::input_report_mode::BatteryLevel;
 use std::{
     io::{
         self,
@@ -21,7 +25,6 @@ use std::{
 };
 mod joycon;
 mod steam_blacklist;
-use crate::joycon::{JoyconIntegration, JoyconStatus, JoyconSvg};
 use steam_blacklist as blacklist;
 mod settings;
 mod style;
@@ -47,7 +50,7 @@ pub fn main() -> iced::Result {
     match MainState::run(settings) {
         Ok(a) => Ok(a),
         Err(e) => {
-            println!("{:?}", e);
+            println!("{e:?}");
             print!("Press enter to continue...");
             io::stdout().flush().unwrap();
             let _ = io::stdin().read(&mut [0u8]).unwrap();
@@ -59,7 +62,6 @@ pub fn main() -> iced::Result {
 #[derive(Debug, Clone)]
 enum Message {
     EventOccurred(iced_native::Event),
-    EnableJoyconsPressed,
     SettingsPressed,
     Tick(Instant),
     Dot(Instant),
@@ -74,12 +76,14 @@ enum Message {
 
 #[derive(Default)]
 struct MainState {
-    joycon: Option<JoyconIntegration>,
+    joycon: Option<joycon::Wrapper>,
     joycon_boxes: Vec<JoyconBox>,
-    joycon_svg: JoyconSvg,
+    joycon_svg: joycon::Svg,
     num_columns: usize,
     search_dots: usize,
     settings_show: bool,
+    server_connected: ServerStatus,
+    server_address: String,
 
     settings: settings::Handler,
     update_found: Option<String>,
@@ -92,12 +96,15 @@ impl Application for MainState {
     type Theme = Theme;
 
     fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
+        let mut new = Self {
+            num_columns: 3,
+            joycon_svg: joycon::Svg::new(),
+            ..Self::default()
+        };
+        new.joycon = Some(joycon::Wrapper::new(new.settings.clone()));
+        new.server_address = format!("{}", new.settings.load().get_socket_address());
         (
-            Self {
-                num_columns: 3,
-                joycon_svg: JoyconSvg::new(),
-                ..Self::default()
-            },
+            new,
             Command::batch(vec![
                 Command::perform(update::check_updates(), Message::UpdateFound),
                 Command::perform(blacklist::check_blacklist(), Message::BlacklistChecked),
@@ -114,9 +121,6 @@ impl Application for MainState {
 
     fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
-            Message::EnableJoyconsPressed => {
-                self.joycon = Some(JoyconIntegration::new(self.settings.clone()));
-            }
             Message::SettingsPressed => {
                 self.settings_show = !self.settings_show;
             }
@@ -130,7 +134,7 @@ impl Application for MainState {
             Message::EventOccurred(_) => {}
             Message::Tick(_time) => {
                 if let Some(ref ji) = self.joycon {
-                    if let Some(mut res) = ji.poll() {
+                    if let Some(mut res) = ji.poll_status() {
                         if res.len() == self.joycon_boxes.len() {
                             for i in 0..self.joycon_boxes.len() {
                                 self.joycon_boxes[i].status = res.remove(0);
@@ -141,6 +145,9 @@ impl Application for MainState {
                                 self.joycon_boxes.push(JoyconBox::new(res.remove(0)));
                             }
                         }
+                    }
+                    if let Some(connected) = ji.poll_server() {
+                        self.server_connected = connected;
                     }
                 }
             }
@@ -190,64 +197,40 @@ impl Application for MainState {
     }
 
     fn view(&self) -> Element<Message> {
-        let mut main_container;
+        let search_dots = ".".repeat(self.search_dots);
+        let main_container =
         if self.settings_show {
-            let mut all_settings = Column::new()
+            let all_settings = Column::new()
                 .spacing(20)
-                .push(address(&self.settings.load().address));
-            if self.joycon.is_some() {
-                all_settings = all_settings.push(text("You need to restart this program to apply the settings as you have already initialized search for controllers."));
-            }
-            main_container = container(all_settings).padding(20);
+                .push(address(&self.settings.load().address))
+                .push(text(
+                    "You need to restart this program after changing this.",
+                ));
+            container(all_settings).padding(20)
         } else {
-            let search_dots = ".".repeat(self.search_dots);
-
             let mut boxes: Vec<Container<Message>> = Vec::new();
-
-            if self.joycon.is_some() {
-                for joycon_box in &self.joycon_boxes {
-                    let scale = self
-                        .settings
-                        .load()
-                        .joycon_scale_get(&joycon_box.status.serial_number);
-                    boxes.push(
-                        contain(joycon_box.view(&self.joycon_svg, scale))
-                            .style(style::item_normal as for<'r> fn(&'r _) -> _),
-                    );
-                }
+            for joycon_box in &self.joycon_boxes {
+                let scale = self
+                    .settings
+                    .load()
+                    .joycon_scale_get(&joycon_box.status.serial_number);
                 boxes.push(
-                    contain(
-                        Column::new()
-                        .push(
-                            text(format!(
-                                "Looking for Joycon controllers{}\n\n\
-                                Please pair controllers in the bluetooth settings of Windows if they don't show up here.",
-                                search_dots
-                            ))
-                        )
-                        .align_items(Alignment::Center),
-                    ).style(style::item_special as for<'r> fn(&'r _) -> _)
-                );
-            } else {
-                let feature_enabler = Column::new()
-                    .spacing(10)
-                    .push(text("Add new trackers"))
-                    .push(
-                        button(text("Search for Joy-Con's"))
-                            .on_press(Message::EnableJoyconsPressed)
-                            .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
-                    );
-                boxes.push(
-                    contain(feature_enabler).style(style::item_special as for<'r> fn(&'r _) -> _),
+                    contain(joycon_box.view(&self.joycon_svg, scale))
+                        .style(style::item_normal as for<'r> fn(&'r _) -> _),
                 );
             }
 
-            let list = float_list(self.num_columns, boxes);
+            let list = float_list(self.num_columns, boxes).push(
+                    text(format!(
+                        "Searching for Joycon controllers{search_dots}\n\
+                        Please pair controllers in the bluetooth settings of Windows if they don't show up here.",
+                    ))
+                );
 
-            main_container = container(list);
+            let scrollable = scrollable(list).height(Length::Fill);
+
+            container(scrollable)
         }
-
-        main_container = main_container
             .width(Length::Fill)
             .height(Length::Fill)
             .style(style::container_darker as for<'r> fn(&'r _) -> _);
@@ -258,7 +241,10 @@ impl Application for MainState {
         if self.blacklist_info.visible() {
             app = app.push(blacklist_bar(&self.blacklist_info));
         }
-        app.push(main_container).into()
+
+        let bottom_bar = bottom_bar(self.server_connected, &search_dots, &self.server_address);
+
+        app.push(main_container).push(bottom_bar).into()
     }
 }
 
@@ -267,11 +253,11 @@ where
     T: Into<Element<'a, M>>,
 {
     container(content)
-        .height(Length::Units(280))
+        .height(Length::Units(300))
         .width(Length::Units(300))
         .padding(10)
 }
-fn float_list(columns: usize, boxes: Vec<Container<'_, Message>>) -> Scrollable<'_, Message> {
+fn float_list(columns: usize, boxes: Vec<Container<'_, Message>>) -> Column<'_, Message> {
     let mut list = Column::new().padding(20).spacing(20).width(Length::Fill);
     for chunk in &boxes.into_iter().chunks(columns) {
         let mut row: Row<Message> = Row::new().spacing(20);
@@ -281,7 +267,7 @@ fn float_list(columns: usize, boxes: Vec<Container<'_, Message>>) -> Scrollable<
         }
         list = list.push(row);
     }
-    scrollable(list).height(Length::Fill)
+    list
 }
 fn address<'a>(input_value: &str) -> Column<'a, Message> {
     let address_info = text("Enter a valid ip with port number:");
@@ -291,12 +277,13 @@ fn address<'a>(input_value: &str) -> Column<'a, Message> {
 
     let mut allc = Column::new().spacing(10).push(address_info).push(address);
 
-    if input_value.parse::<SocketAddr>().is_ok() {
-        allc = allc.push(vertical_space(Length::Units(20)));
-    } else {
-        allc = allc.push(text(
-            "Input not a valid ip with port number! Using default instead (127.0.0.1:6969).",
-        ));
+    if input_value.parse::<SocketAddr>().is_err() {
+        allc = allc.push(
+            container(text(
+                "Input not a valid ip with port number! Using default instead (127.0.0.1:6969).",
+            ))
+            .style(style::text_yellow as for<'r> fn(&'r _) -> _),
+        );
     }
     allc
 }
@@ -311,7 +298,7 @@ fn top_bar<'a>(update: Option<String>) -> Container<'a, Message> {
             .on_press(Message::UpdatePressed);
         top_column = top_column
             .push(horizontal_space(Length::Units(20)))
-            .push(text(format!("New Update found! Version: {}. ", u)))
+            .push(text(format!("New update found! Version: {u}. ")))
             .push(update_btn);
     }
 
@@ -346,16 +333,41 @@ fn blacklist_bar<'a>(result: &blacklist::BlacklistResult) -> Container<'a, Messa
         .style(style::container_info as for<'r> fn(&'r _) -> _)
 }
 
+fn bottom_bar<'a>(
+    connected: ServerStatus,
+    search_dots: &String,
+    address: &String,
+) -> Container<'a, Message> {
+    let status = Row::new()
+        .push(text("Connection to SlimeVR Server: "))
+        .push(container(text(format!("{connected:?}"))).style(
+            if connected == ServerStatus::Connected {
+                style::text_green
+            } else {
+                style::text_yellow
+            },
+        ))
+        .push(text(if connected == ServerStatus::Connected {
+            format!(" to {address}.")
+        } else {
+            format!(". Trying to connect to {address}{search_dots}")
+        }));
+    container(status)
+        .width(Length::Fill)
+        .padding(20)
+        .style(style::container_info as for<'r> fn(&'r _) -> _)
+}
+
 #[derive(Debug, Clone)]
 struct JoyconBox {
-    pub status: JoyconStatus,
+    pub status: joycon::Status,
 }
 
 impl JoyconBox {
-    fn new(status: JoyconStatus) -> Self {
+    const fn new(status: joycon::Status) -> Self {
         Self { status }
     }
-    fn view(&self, svg_handler: &JoyconSvg, scale: f64) -> Column<Message> {
+    fn view(&self, svg_handler: &joycon::Svg, scale: f64) -> Column<Message> {
         let sn = self.status.serial_number.clone();
 
         let buttons = Row::new()
@@ -387,8 +399,15 @@ impl JoyconBox {
                 "Roll: {:.0}\nPitch: {:.0}\nYaw: {:.0}",
                 self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
             )))
-            .height(Length::Units(160));
+            .height(Length::Units(150));
 
+        let battery_text = container(text(format!("{:?}", self.status.battery_level))).style(
+            match self.status.battery_level {
+                BatteryLevel::Empty | BatteryLevel::Critical => style::text_orange,
+                BatteryLevel::Low => style::text_yellow,
+                BatteryLevel::Medium | BatteryLevel::Full => style::text_green,
+            },
+        );
         let bottom = Column::new()
             .spacing(10)
             .push(
@@ -397,8 +416,9 @@ impl JoyconBox {
                 })
                 .step(0.001),
             )
-            .push(text(format!("Rotation scale ratio: {:.3}", scale)))
-            .push(text("Change this if the tracker in vr moves less or more than your irl joycon. Higher value = more movement.").size(14));
+            .push(text(format!("Rotation scale ratio: {scale:.3}")))
+            .push(text("Change this if the tracker in vr moves less or more than your irl joycon. Higher value = more movement.").size(14))
+            .push(Row::new().push(text("Battery level: ")).push(battery_text));
 
         Column::new().spacing(10).push(top).push(bottom)
     }

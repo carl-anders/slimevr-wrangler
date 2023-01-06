@@ -124,4 +124,8 @@ pub enum PacketType {
         quat: SlimeQuaternion,
         calibration_info: u8,
     },
+    #[deku(id = "21")]
+    UserAction { packet_id: u64, typ: u8 },
+    #[deku(id = "55076217")] // u8 array with [3, 'H', 'e', 'y'] as u32
+    HandshakeResponse,
 }

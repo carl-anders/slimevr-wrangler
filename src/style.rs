@@ -23,7 +23,7 @@ fn container_base(bg: Color) -> container::Appearance {
 pub fn item_normal(_theme: &Theme) -> container::Appearance {
     item_base(Color::from_rgb8(0x36, 0x39, 0x3F))
 }
-pub fn item_special(_theme: &Theme) -> container::Appearance {
+pub fn _item_special(_theme: &Theme) -> container::Appearance {
     item_base(Color::from_rgb8(0x3c, 0x38, 0x4A))
 }
 fn item_base(bg: Color) -> container::Appearance {
@@ -31,6 +31,22 @@ fn item_base(bg: Color) -> container::Appearance {
         background: bg.into(),
         text_color: Color::WHITE.into(),
         border_radius: 5.0,
+        ..container::Appearance::default()
+    }
+}
+
+pub fn text_orange(_theme: &Theme) -> container::Appearance {
+    text_base(Color::from_rgb8(0xff, 0x62, 0x3c))
+}
+pub fn text_yellow(_theme: &Theme) -> container::Appearance {
+    text_base(Color::from_rgb8(0xff, 0xe3, 0x3c))
+}
+pub fn text_green(_theme: &Theme) -> container::Appearance {
+    text_base(Color::from_rgb8(0xd3, 0xfb, 0xe1))
+}
+fn text_base(bg: Color) -> container::Appearance {
+    container::Appearance {
+        text_color: bg.into(),
         ..container::Appearance::default()
     }
 }
