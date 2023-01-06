@@ -36,12 +36,18 @@ pub const ICONS: Font = Font::External {
     name: "Icons",
     bytes: include_bytes!("../assets/icons.ttf"),
 };
+pub const ICON: &[u8; 16384] = include_bytes!("../assets/icon_64.rgba8");
 
 pub fn main() -> iced::Result {
+    /*
+    let rgba8 = image_rs::io::Reader::open("assets/icon.png").unwrap().decode().unwrap().to_rgba8();
+    std::fs::write("assets/icon_64.rgba8", rgba8.into_raw());
+    */
     let settings = Settings {
         window: window::Settings {
             min_size: Some(WINDOW_SIZE),
             size: WINDOW_SIZE,
+            icon: window::Icon::from_rgba(ICON.to_vec(), 64, 64).ok(),
             ..window::Settings::default()
         },
         antialiasing: true,
