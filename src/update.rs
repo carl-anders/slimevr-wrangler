@@ -36,7 +36,7 @@ pub fn update() {
                 panic!("Update complete.");
             }
             Err(e) => {
-                println!("Update not successful.\n{}", e);
+                println!("Update not successful.\n{e}");
             }
         }
     }

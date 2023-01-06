@@ -87,7 +87,7 @@ fn inner_update() -> BlacklistResult {
                     println!("[ERROR] Steam config - Could not save config file.");
                 },
                 BlacklistError::IO(e) => {
-                    println!("[ERROR] Could not read/write config file. Full Error:\n{:?}", e);
+                    println!("[ERROR] Could not read/write config file. Full Error:\n{e:?}");
                 },
             }
             BlacklistResult::info("Couldn't update steam controller blacklist. More info in console.")

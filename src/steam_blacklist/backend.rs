@@ -49,9 +49,9 @@ fn read_config() -> io::Result<String> {
     fs::read_to_string(get_steam_config_path()?)
 }
 
-fn set_blacklist<'a>(
+fn set_blacklist(
     raw_text: &str,
-    config: &Vdf<'a>,
+    config: &Vdf<'_>,
     new_list: &str,
 ) -> Result<String, BlacklistError> {
     let output = match get_blacklist(config) {
