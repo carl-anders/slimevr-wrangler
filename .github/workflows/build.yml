@@ -13,6 +13,10 @@ jobs:
         mkdir .cargo
         echo '[target.x86_64-pc-windows-msvc]' >> .cargo/config
         echo 'rustflags = ["-Ctarget-feature=+crt-static"]' >> .cargo/config
+    - name: Cache cargo dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "wrangler"
     - name: Build windows binary
       run: cargo build --verbose --release
     - name: Archive windows binary
@@ -25,6 +29,10 @@ jobs:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Cache cargo dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "wrangler"
     - name: Build mac binary
       env:
         MACOSX_DEPLOYMENT_TARGET: 10.14
@@ -46,6 +54,10 @@ jobs:
         export DEBIAN_FRONTED=noninteractive
         sudo apt-get -qq update
         sudo apt-get install -y libxkbcommon-dev libudev-dev build-essential linux-tools-common pkg-config libssl-dev libusb-1.0-0-dev clang
+    - name: Cache cargo dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "wrangler"
     - name: Build ubuntu binary
       run: cargo build --verbose --release
     - name: Open binary via double-click
