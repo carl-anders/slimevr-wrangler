@@ -17,9 +17,6 @@ use std::time::Duration;
 // Convert to acceleration in G
 fn acc(n: i16, offset: i16) -> f64 {
     let n = n.saturating_sub(offset);
-    /* if n as f64 * 0.00024414435f64 > 3.0 {
-        println!("G: {}", n as f64 * 0.00024414435f64);
-    } */
     n as f64 * 0.00024414435f64 // 16000/65535/1000
 }
 // Convert to acceleration in radians/s
