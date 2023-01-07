@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use deku::{DekuContainerRead, DekuContainerWrite};
-    use nalgebra::{Quaternion, UnitQuaternion};
+    use nalgebra031::{Quaternion, UnitQuaternion};
 
     use crate::PacketType;
 
@@ -92,5 +92,21 @@ mod tests {
         ];
 
         assert_eq!(acc.to_bytes().unwrap(), data);
+    }
+    #[test]
+    fn test_user_action() {
+        let ua = PacketType::UserAction {
+            packet_id: 1,
+            typ: 3,
+        };
+        assert_eq!(
+            ua.to_bytes().unwrap(),
+            [0, 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 1, 3]
+        );
+    }
+    #[test]
+    fn test_handshake_response() {
+        let hr = PacketType::HandshakeResponse;
+        assert_eq!(hr.to_bytes().unwrap(), "\x03Hey".as_bytes());
     }
 }

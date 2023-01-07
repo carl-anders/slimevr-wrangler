@@ -9,3 +9,6 @@ deku = "0.15"
 # We support multiple versions of nalgebra since it changes so much.
 nalgebra031 = { package = "nalgebra", version = "0.31", optional = true }
 nalgebra030 = { package = "nalgebra", version = "0.30", optional = true }
+
+[dev-dependencies]
+nalgebra031 = { package = "nalgebra", version = "0.31" }
