@@ -5,16 +5,16 @@ use iced::{
     theme::{self, Theme},
     time,
     widget::{
-        button, container, horizontal_space, scrollable, slider, text, text_input, Column,
+        button, canvas, container, horizontal_space, scrollable, slider, text, text_input, Column,
         Container, Row, Svg,
     },
-    window,
-    Alignment, Application, Command, Element, Font, Length, Settings, Subscription,
+    window, Alignment, Application, Command, Element, Font, Length, Settings, Subscription,
 };
 
 use itertools::Itertools;
 use joycon::ServerStatus;
 use joycon_rs::prelude::input_report_mode::BatteryLevel;
+use needle::Needle;
 use std::{
     io::{
         self,
@@ -26,6 +26,7 @@ use std::{
 mod joycon;
 mod steam_blacklist;
 use steam_blacklist as blacklist;
+mod needle;
 mod settings;
 mod style;
 mod update;
@@ -94,6 +95,7 @@ struct MainState {
     settings: settings::Handler,
     update_found: Option<String>,
     blacklist_info: blacklist::BlacklistResult,
+    needles: Vec<Needle>,
 }
 impl Application for MainState {
     type Executor = executor::Default;
@@ -109,6 +111,9 @@ impl Application for MainState {
         };
         new.joycon = Some(joycon::Wrapper::new(new.settings.clone()));
         new.server_address = format!("{}", new.settings.load().get_socket_address());
+        for i in 0..360 {
+            new.needles.push(Needle::new(i));
+        }
         (
             new,
             Command::batch(vec![
@@ -214,14 +219,12 @@ impl Application for MainState {
                 ));
             container(all_settings).padding(20)
         } else {
+            let settings = self.settings.load();
             let mut boxes: Vec<Container<Message>> = Vec::new();
             for joycon_box in &self.joycon_boxes {
-                let scale = self
-                    .settings
-                    .load()
-                    .joycon_scale_get(&joycon_box.status.serial_number);
+                let scale = settings.joycon_scale_get(&joycon_box.status.serial_number);
                 boxes.push(
-                    contain(joycon_box.view(&self.joycon_svg, scale))
+                    contain(joycon_box.view(&self.joycon_svg, scale, &self.needles))
                         .style(style::item_normal as for<'r> fn(&'r _) -> _),
                 );
             }
@@ -373,7 +376,12 @@ impl JoyconBox {
     const fn new(status: joycon::Status) -> Self {
         Self { status }
     }
-    fn view(&self, svg_handler: &joycon::Svg, scale: f64) -> Column<Message> {
+    fn view<'a>(
+        &'a self,
+        svg_handler: &joycon::Svg,
+        scale: f64,
+        needles: &'a [Needle],
+    ) -> Column<Message> {
         let sn = self.status.serial_number.clone();
 
         let buttons = Row::new()
@@ -396,15 +404,36 @@ impl JoyconBox {
             .align_items(Alignment::Center)
             .push(buttons)
             .push(svg)
-            .width(Length::Units(150));
+            .width(Length::Units(140));
+
+        let rot = self.status.rotation;
+        let values = Row::with_children(
+            [("Roll", rot.0), ("Pitch", rot.1), ("Yaw", -rot.2)]
+                .iter()
+                .map(|(name, val)| {
+                    let ival = (*val as i32).rem_euclid(360) as usize;
+                    let needle = needles.get(ival).unwrap_or_else(|| &needles[0]);
+
+                    Column::new()
+                        .push(text(name))
+                        .push(
+                            canvas(needle)
+                                .width(Length::Units(25))
+                                .height(Length::Units(25)),
+                        )
+                        .push(text(format!("{ival}")))
+                        .spacing(10)
+                        .align_items(Alignment::Center)
+                        .width(Length::Fill)
+                        .into()
+                })
+                .collect(),
+        );
 
         let top = Row::new()
             .spacing(10)
             .push(left)
-            .push(text(format!(
-                "Roll: {:.0}\nPitch: {:.0}\nYaw: {:.0}",
-                self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
-            )))
+            .push(values)
             .height(Length::Units(150));
 
         let battery_text = container(text(format!("{:?}", self.status.battery_level))).style(
