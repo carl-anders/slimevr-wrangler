@@ -93,6 +93,7 @@ fn calc_acceleration(
         z: axisdata.accel_z - gravity[2],
     };
 
+    let rad_rotation = -rad_rotation;
     Xyz {
         x: vector.x * rad_rotation.cos() - vector.y * rad_rotation.sin(),
         y: vector.x * rad_rotation.sin() + vector.y * rad_rotation.cos(),
@@ -163,7 +164,7 @@ impl Communication {
             imu: 0,
             mcu_type: 0,
             imu_info: (0, 0, 0),
-            build: 0,
+            build: 9,
             firmware: "slimevr-wrangler".to_string().into(),
             mac_address: [0x00, 0x0F, 0x00, 0x0F, 0x00, 0x0F],
         };
@@ -229,9 +230,11 @@ impl Communication {
                         .unwrap();
 
                     let acc = calc_acceleration(device.imu.rotation, &imu_data[2], rad_rotation);
-                    if std::env::args().any(|a| &a == "debug") {
-                        println!("x: {:.3}, y: {:.3}, z: {:.3}", acc.x, acc.y, acc.z);
-                    }
+                    /* if std::env::args().any(|a| &a == "debug") {
+                        if acc.x.abs() > 3.0 || acc.y.abs() > 3.0 || acc.z.abs() > 3.0 {
+                            println!("x: {:.3}, y: {:.3}, z: {:.3}", acc.x, acc.y, acc.z);
+                        }
+                    } */
 
                     let acceleration_packet = PacketType::Acceleration {
                         packet_id: 0,
