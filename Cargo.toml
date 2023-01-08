@@ -14,9 +14,9 @@ build = "build.rs"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-iced = { version = "0.6", features = ["async-std", "svg", "canvas", "wgpu"] }
+iced = { version = "0.6", features = ["tokio", "svg", "canvas", "wgpu"] }
 iced_native = "0.7"
-async-std = "1.0"
+tokio = { version = "1.24.1", features = ["full"] }
 joycon-rs = { git = "https://github.com/carl-anders/joycon-rs" }
 directories = "4.0"
 self_update = { version = "0.32", features = [
@@ -40,8 +40,7 @@ winreg = "0.10"
 winres = "0.1"
 
 [target.'cfg(target_os="linux")'.dependencies]
-# This only will give timings on when IMU data is given...
-stick = { git = "https://github.com/medakk/stick.git", branch = "workingjoycon" }
+evdev = { version = "0.12.1", features = ["tokio"] }
 
 [profile.release]
 lto = true
