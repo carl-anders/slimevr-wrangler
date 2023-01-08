@@ -1,11 +1,9 @@
 use std::{sync::mpsc, thread, time::Duration};
 
-use joycon_rs::prelude::input_report_mode::BatteryLevel;
-
 use super::{
     communication::{ChannelData, ChannelInfo},
     imu::JoyconAxisData,
-    JoyconDesign, JoyconDesignType,
+    Battery, JoyconDesign, JoyconDesignType,
 };
 
 fn spawn_test(tx: mpsc::Sender<ChannelData>, color: String, sn: String, z_change: f64) {
@@ -35,7 +33,7 @@ fn spawn_test(tx: mpsc::Sender<ChannelData>, color: String, sn: String, z_change
 
         tx.send(ChannelData {
             serial_number: sn.clone(),
-            info: ChannelInfo::BatteryLevel(BatteryLevel::Medium),
+            info: ChannelInfo::Battery(Battery::Medium),
         })
         .unwrap();
 

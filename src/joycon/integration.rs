@@ -1,6 +1,6 @@
 use super::communication::ChannelData;
 use super::imu::JoyconAxisData;
-use super::{ChannelInfo, JoyconDesign, JoyconDesignType};
+use super::{Battery, ChannelInfo, JoyconDesign, JoyconDesignType};
 use crate::settings;
 use joycon_rs::joycon::device::calibration::imu::IMUCalibration;
 use joycon_rs::joycon::lights::{LightUp, Lights};
@@ -27,6 +27,23 @@ fn gyro(n: i16, offset: i16, scale: f64) -> f64 {
     //* (936.0 / (13371 - offset) as f64) // to degrees/s
     * 0.07000839246f64 // 4588/65535 - degrees/s
     .to_radians() // radians/s
+}
+
+fn convert_battery(battery: BatteryLevel) -> Battery {
+    match battery {
+        BatteryLevel::Empty => Battery::Empty,
+        BatteryLevel::Critical => Battery::Critical,
+        BatteryLevel::Low => Battery::Low,
+        BatteryLevel::Medium => Battery::Medium,
+        BatteryLevel::Full => Battery::Full,
+    }
+}
+
+fn convert_design(device_type: &JoyConDeviceType) -> JoyconDesignType {
+    match device_type {
+        JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => JoyconDesignType::Left,
+        JoyConDeviceType::JoyConR => JoyconDesignType::Right,
+    }
 }
 
 fn joycon_listen_loop(
@@ -58,7 +75,7 @@ fn joycon_listen_loop(
                         last_battery = report.common.battery.level;
                         tx.send(ChannelData {
                             serial_number: serial_number.clone(),
-                            info: ChannelInfo::BatteryLevel(last_battery),
+                            info: ChannelInfo::Battery(convert_battery(last_battery)),
                         })
                         .unwrap();
                     }
@@ -115,12 +132,7 @@ fn joycon_thread(
                         "#{:02x}{:02x}{:02x}",
                         color.body[0], color.body[1], color.body[2]
                     ),
-                    design_type: match joycon.device_type() {
-                        JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => {
-                            JoyconDesignType::Left
-                        }
-                        JoyConDeviceType::JoyConR => JoyconDesignType::Right,
-                    },
+                    design_type: convert_design(&joycon.device_type()),
                 };
 
                 let mut calib = joycon.imu_user_calibration().clone();

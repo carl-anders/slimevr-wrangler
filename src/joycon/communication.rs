@@ -6,7 +6,6 @@ use std::{
 };
 
 use itertools::Itertools;
-use joycon_rs::prelude::input_report_mode::BatteryLevel;
 use nalgebra::{UnitQuaternion, Vector3};
 use protocol::deku::{DekuContainerRead, DekuContainerWrite};
 use protocol::PacketType;
@@ -17,20 +16,29 @@ use super::{
 };
 use crate::settings::{self, WranglerSettings};
 
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Battery {
+    Empty,
+    Critical,
+    Low,
+    Medium,
+    Full,
+}
+
 #[derive(Debug, Clone)]
 pub struct Status {
     pub rotation: (f64, f64, f64),
     pub design: JoyconDesign,
     pub mount_rotation: i32,
     pub serial_number: String,
-    pub battery_level: BatteryLevel,
+    pub battery: Battery,
 }
 
 struct Device {
     imu: Imu,
     design: JoyconDesign,
     id: u8,
-    battery_level: BatteryLevel,
+    battery: Battery,
 }
 
 impl Device {
@@ -57,7 +65,7 @@ pub struct ChannelData {
 pub enum ChannelInfo {
     Connected(JoyconDesign),
     ImuData([JoyconAxisData; 3]),
-    BatteryLevel(BatteryLevel),
+    Battery(Battery),
     Reset,
 }
 /*
@@ -190,7 +198,7 @@ impl Communication {
                 if self.devices.contains_key(&sn) {
                     let device = self.devices.get_mut(&sn).unwrap();
                     device.imu = Imu::new();
-                    device.battery_level = BatteryLevel::Full;
+                    device.battery = Battery::Full;
                     return;
                 }
                 let id = self.devices.len() as _;
@@ -198,7 +206,7 @@ impl Communication {
                     design,
                     imu: Imu::new(),
                     id,
-                    battery_level: BatteryLevel::Full,
+                    battery: Battery::Full,
                 };
                 device.handshake(&self.socket, &self.address);
                 self.devices.insert(sn, device);
@@ -246,9 +254,9 @@ impl Communication {
                         .unwrap();
                 }
             }
-            ChannelInfo::BatteryLevel(battery_level) => {
+            ChannelInfo::Battery(battery) => {
                 if let Some(device) = self.devices.get_mut(&sn) {
-                    device.battery_level = battery_level;
+                    device.battery = battery;
                 }
             }
             ChannelInfo::Reset => {
@@ -319,7 +327,7 @@ impl Communication {
                         design: device.design.clone(),
                         mount_rotation: settings.joycon_rotation_get(serial_number),
                         serial_number: serial_number.clone(),
-                        battery_level: device.battery_level,
+                        battery: device.battery,
                     });
                 }
                 self.status_tx.send(statuses).ok();

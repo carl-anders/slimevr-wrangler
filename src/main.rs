@@ -12,8 +12,7 @@ use iced::{
 };
 
 use itertools::Itertools;
-use joycon::ServerStatus;
-use joycon_rs::prelude::input_report_mode::BatteryLevel;
+use joycon::{Battery, ServerStatus};
 use needle::Needle;
 use std::{
     io::{
@@ -445,13 +444,14 @@ impl JoyconBox {
             .push(values)
             .height(Length::Units(150));
 
-        let battery_text = container(text(format!("{:?}", self.status.battery_level))).style(
-            match self.status.battery_level {
-                BatteryLevel::Empty | BatteryLevel::Critical => style::text_orange,
-                BatteryLevel::Low => style::text_yellow,
-                BatteryLevel::Medium | BatteryLevel::Full => style::text_green,
-            },
-        );
+        let battery_text = container(text(format!("{:?}", self.status.battery))).style(match self
+            .status
+            .battery
+        {
+            Battery::Empty | Battery::Critical => style::text_orange,
+            Battery::Low => style::text_yellow,
+            Battery::Medium | Battery::Full => style::text_green,
+        });
         let bottom = Column::new()
             .spacing(10)
             .push(
