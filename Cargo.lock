@@ -3542,6 +3542,7 @@ dependencies = [
  "serde",
  "serde_json",
  "spin_sleep",
+ "stick",
  "thiserror",
  "vqf-cxx",
  "winreg",
@@ -3568,6 +3569,12 @@ name = "smawk"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f67ad224767faa3c7d8b6d91985b78e70a1324408abcb1cfcc2be4c06bc06043"
+
+[[package]]
+name = "smelling_salts"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0ac3b24afd6d59663abbd40d5b99d281d19413e70f43dc5277dfda314c1647b"
 
 [[package]]
 name = "smithay-client-toolkit"
@@ -3633,6 +3640,16 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stick"
+version = "0.12.2"
+source = "git+https://github.com/medakk/stick.git?branch=workingjoycon#dc7d57c0364d998a5f80ef609462e4c321934fc2"
+dependencies = [
+ "log",
+ "smelling_salts",
+ "winapi",
+]
 
 [[package]]
 name = "str-buf"

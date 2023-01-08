@@ -39,6 +39,10 @@ winreg = "0.10"
 [target.'cfg(target_os="windows")'.build-dependencies]
 winres = "0.1"
 
+[target.'cfg(target_os="linux")'.dependencies]
+# This only will give timings on when IMU data is given...
+stick = { git = "https://github.com/medakk/stick.git", branch = "workingjoycon" }
+
 [profile.release]
 lto = true
 codegen-units = 1
