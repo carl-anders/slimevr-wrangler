@@ -29,7 +29,16 @@ pub struct WranglerSettings {
     pub address: String,
     #[serde(default)]
     pub joycon: HashMap<String, Joycon>,
+    #[serde(default = "return_true")]
+    pub send_reset: bool,
 }
+
+fn return_true() -> bool {
+    true
+}
+
+const DEFAULT_ADDR: &str = "127.0.0.1:6969";
+
 impl WranglerSettings {
     pub fn save(&self) {
         let file = file_name().unwrap();
@@ -45,8 +54,9 @@ impl WranglerSettings {
             .and_then(|path| File::open(path).ok())
             .and_then(|file| serde_json::from_reader(BufReader::new(file)).ok())
             .unwrap_or_else(|| Self {
-                address: "127.0.0.1:6969".into(),
+                address: DEFAULT_ADDR.into(),
                 joycon: HashMap::new(),
+                send_reset: true,
             })
     }
     pub fn joycon_rotation_add(&mut self, serial_number: String, degrees: i32) {
@@ -67,9 +77,8 @@ impl WranglerSettings {
     }
     pub fn get_socket_address(&self) -> SocketAddr {
         self.address
-            .clone()
             .parse::<SocketAddr>()
-            .unwrap_or_else(|_| "127.0.0.1:6969".parse().unwrap())
+            .unwrap_or_else(|_| DEFAULT_ADDR.parse().unwrap())
     }
 }
 impl Default for WranglerSettings {

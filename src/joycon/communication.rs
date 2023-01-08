@@ -252,7 +252,7 @@ impl Communication {
                 }
             }
             ChannelInfo::Reset => {
-                if self.last_reset.elapsed().as_secs() >= 2 {
+                if settings.send_reset && self.last_reset.elapsed().as_secs() >= 2 {
                     self.last_reset = Instant::now();
                     self.send_reset();
                 }

@@ -5,8 +5,8 @@ use iced::{
     theme::{self, Theme},
     time,
     widget::{
-        button, canvas, container, horizontal_space, scrollable, slider, text, text_input, Column,
-        Container, Row, Svg,
+        button, canvas, checkbox, container, horizontal_space, scrollable, slider, text,
+        text_input, Column, Container, Row, Svg,
     },
     window, Alignment, Application, Command, Element, Font, Length, Settings, Subscription,
 };
@@ -79,6 +79,7 @@ enum Message {
     BlacklistFixPressed,
     JoyconRotate(String, bool),
     JoyconScale(String, f64),
+    SettingsResetToggled(bool),
 }
 
 #[derive(Default)]
@@ -192,6 +193,9 @@ impl Application for MainState {
                 self.settings
                     .change(|ws| ws.joycon_scale_set(serial_number, scale));
             }
+            Message::SettingsResetToggled(new) => {
+                self.settings.change(|ws| ws.send_reset = new);
+            }
         }
         Command::none()
     }
@@ -216,6 +220,11 @@ impl Application for MainState {
                 .push(address(&self.settings.load().address))
                 .push(text(
                     "You need to restart this program after changing this.",
+                ))
+                .push(checkbox(
+                    "Send yaw reset command to SlimeVR Server after B or UP button press.",
+                    self.settings.load().send_reset,
+                    Message::SettingsResetToggled,
                 ));
             container(all_settings).padding(20)
         } else {
