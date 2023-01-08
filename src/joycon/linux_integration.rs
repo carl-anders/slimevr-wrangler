@@ -5,7 +5,7 @@ use evdev::{enumerate, Device, EventStream};
 
 use crate::settings;
 
-use super::{ChannelData, JoyconDesignType};
+use super::{ChannelData, JoyconDesignType, Battery};
 
 const USB_VENDOR_ID_NINTENDO: u16 = 0x057e;
 const USB_DEVICE_ID_NINTENDO_WIIMOTE: u16 = 0x0306;
@@ -27,6 +27,7 @@ fn convert_design(product_code: u16) -> JoyconDesignType {
 async fn joycon_listener(tx: mpsc::Sender<ChannelData>, settings: settings::Handler, mut input: EventStream) {
     let mac = input.device().unique_name().unwrap(); // Joycons always have unique name
     let device_type = convert_design(input.device().input_id().product());
+    let battery = Battery::Full; // can be fetched with upower
     loop {
         let ev = input.next_event().await.unwrap();
         
