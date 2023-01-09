@@ -77,17 +77,18 @@ async fn imu_listener(
     let mut count = 0;
     loop {
         let _ev = input.next_event().await.unwrap();
+        println!("{:?}", _ev.timestamp());
         let gyro_scale_factor = settings.load().joycon_scale_get(&mac);
         let axis = input.device().get_abs_state().unwrap();
         let accel_axis = &axis[..3];
         let gyro_axis = &axis[3..6];
         imu_array[count] = JoyconAxisData {
-            accel_x: acc(accel_axis[0].value as i32),
-            accel_y: acc(accel_axis[1].value as i32),
-            accel_z: acc(accel_axis[2].value as i32),
-            gyro_x: gyro(gyro_axis[0].value as i32, gyro_scale_factor),
-            gyro_y: gyro(gyro_axis[1].value as i32, gyro_scale_factor),
-            gyro_z: gyro(gyro_axis[2].value as i32, gyro_scale_factor),
+            accel_x: acc(accel_axis[0].value),
+            accel_y: acc(accel_axis[1].value),
+            accel_z: acc(accel_axis[2].value),
+            gyro_x: gyro(gyro_axis[0].value, gyro_scale_factor),
+            gyro_y: gyro(gyro_axis[1].value, gyro_scale_factor),
+            gyro_z: gyro(gyro_axis[2].value, gyro_scale_factor),
         };
 
         count += 1;
@@ -116,7 +117,7 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
             {
                 continue;
             }
-            if let Err(_) = device.grab() {
+            if device.grab().is_err() {
                 println!(
                     "Joycon {:?} was grabbed by someone else already.",
                     device.unique_name()

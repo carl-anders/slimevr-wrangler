@@ -28,9 +28,13 @@ impl Wrapper {
             std::thread::spawn(move || test_controllers(tx_clone));
         }
 
+        // evdev integration
         #[cfg(target_os = "linux")]
-        std::thread::spawn(move || linux_integration::spawn_thread(tx, settings_clone));
-        #[cfg(not(target_os = "linux"))]
+        {
+            let tx = tx.clone();
+            let settings_clone = settings_clone.clone();
+            std::thread::spawn(move || linux_integration::spawn_thread(tx, settings_clone));
+        }
         std::thread::spawn(move || spawn_thread(tx, settings_clone));
         
         Self {
