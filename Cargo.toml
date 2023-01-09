@@ -17,6 +17,7 @@ serde_json = "1.0"
 iced = { version = "0.6", features = ["tokio", "svg", "canvas", "wgpu"] }
 iced_native = "0.7"
 tokio = { version = "1.24.1", features = ["full"] }
+tokio-stream = "0.1"
 joycon-rs = { git = "https://github.com/carl-anders/joycon-rs" }
 directories = "4.0"
 self_update = { version = "0.32", features = [
@@ -40,8 +41,9 @@ winreg = "0.10"
 winres = "0.1"
 
 [target.'cfg(target_os="linux")'.dependencies]
-evdev = { version = "0.12.1", features = ["tokio"] }
-tokio-udev = "0.8"
+evdev = { version = "0.12", features = ["tokio"] }
+upower_dbus = { git = "https://github.com/ImUrX/upower-dbus.git", branch = "patch-1" }
+zbus = { version = "3", default-features = false, features = ["tokio"] }
 
 [profile.release]
 lto = true

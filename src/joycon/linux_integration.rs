@@ -3,9 +3,11 @@ use std::{
     sync::mpsc,
     time::{Duration, SystemTime},
 };
-use tokio::time::{interval, sleep};
+use tokio::time::interval;
 
-use evdev::{enumerate, Device, EventStream, InputEventKind, Key};
+use evdev::{enumerate, EventStream, InputEventKind, Key};
+use tokio_stream::StreamExt;
+use upower_dbus::{DeviceProxy, UPowerProxy};
 
 use crate::settings;
 
@@ -39,13 +41,23 @@ fn convert_design(product_code: u16) -> JoyconDesignType {
     }
 }
 
+fn convert_battery(battery: upower_dbus::BatteryLevel) -> Battery {
+    match battery {
+        upower_dbus::BatteryLevel::Full | upower_dbus::BatteryLevel::High => Battery::Full,
+        upower_dbus::BatteryLevel::Normal => Battery::Medium,
+        upower_dbus::BatteryLevel::Low => Battery::Low,
+        upower_dbus::BatteryLevel::Critical => Battery::Critical,
+        upower_dbus::BatteryLevel::Unknown | upower_dbus::BatteryLevel::None => Battery::Empty,
+    }
+}
+
 async fn joycon_listener(
     tx: mpsc::Sender<ChannelData>,
-    settings: settings::Handler,
+    _settings: settings::Handler,
     mut input: EventStream,
 ) {
     let mac = input.device().unique_name().unwrap().to_string(); // Joycons always have unique name
-    let battery = Battery::Full; // can be fetched with upower
+
     loop {
         let ev = input.next_event().await.unwrap();
 
@@ -54,8 +66,7 @@ async fn joycon_listener(
                 tx.send(ChannelData {
                     serial_number: mac.clone(),
                     info: ChannelInfo::Reset,
-                })
-                .unwrap();
+                }).unwrap();
             }
         }
     }
@@ -78,8 +89,10 @@ async fn imu_listener(
     let mut count = 0;
     let mut sys_time = SystemTime::now();
     let mut last_event = input.device().get_abs_state().unwrap();
+
     loop {
         let ev = input.next_event().await.unwrap();
+        // If it's the same timestamp, just skip and remember the event
         if ev.timestamp() == sys_time {
             last_event = input.device().get_abs_state().unwrap();
             continue;
@@ -87,6 +100,7 @@ async fn imu_listener(
         sys_time = ev.timestamp();
 
         let gyro_scale_factor = settings.load().joycon_scale_get(&mac);
+        // We grab the last event so we actually announce it on the tx
         let axis = last_event;
         last_event = input.device().get_abs_state().unwrap();
 
@@ -100,25 +114,61 @@ async fn imu_listener(
             gyro_y: gyro(gyro_axis[1].value, gyro_scale_factor),
             gyro_z: gyro(gyro_axis[2].value, gyro_scale_factor),
         };
+
         count += 1;
         if count == 3 {
             count = 0;
             tx.send(ChannelData {
                 serial_number: mac.clone(),
                 info: ChannelInfo::ImuData(imu_array),
-            })
-            .unwrap();
+            }).unwrap();
         }
     }
 }
 
+async fn battery_listener(
+    tx: mpsc::Sender<ChannelData>,
+    _settings: settings::Handler,
+    path: zbus::zvariant::OwnedObjectPath,
+) {
+    let connection = zbus::Connection::system().await.unwrap();
+    let device = DeviceProxy::new(&connection, path).await.unwrap();
+    let mac = device.serial().await.unwrap();
+    let level = convert_battery(device.battery_level().await.unwrap());
+
+    tx.send(ChannelData {
+        serial_number: mac.clone(),
+        info: ChannelInfo::Battery(level),
+    }).unwrap();
+
+    let mut stream = device.receive_battery_level_changed().await;
+
+    if let Some(battery) = stream.next().await {
+        let level = convert_battery(battery.get().await.unwrap());
+
+        tx.send(ChannelData {
+            serial_number: mac.clone(),
+            info: ChannelInfo::Battery(level),
+        }).unwrap();
+    }
+}
+
 #[tokio::main]
-pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Handler) {
+pub async fn spawn_thread(
+    tx: mpsc::Sender<ChannelData>,
+    settings: settings::Handler,
+) {
     let mut slow_stream = interval(Duration::from_secs(5));
     let mut paths = HashSet::new();
+    let connection = zbus::Connection::system().await.unwrap();
+    let upower = UPowerProxy::new(&connection).await.unwrap();
+
     loop {
+        // Wait 5 seconds for enumerating
         slow_stream.tick().await;
         for (path, mut device) in enumerate() {
+            // Check if device is a nintendo one or it's already in the paths hashset
+            // then check if its any of the supported switch joysticks
             if (device.input_id().vendor() != USB_VENDOR_ID_NINTENDO || paths.contains(&path))
                 || (device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONL
                     && device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONR
@@ -126,6 +176,7 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
             {
                 continue;
             }
+
             if device.grab().is_err() {
                 println!(
                     "Joycon {:?} was grabbed by someone else already.",
@@ -133,24 +184,41 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
                 );
                 continue;
             }
+
             paths.insert(path);
             let tx = tx.clone();
             let settings = settings.clone();
+
             // The device name is defined on all nintendo devices in the kernel,
             // so unwrap shouldn't fail...
             if device.name().unwrap().ends_with("IMU") {
+                // Make IMU event listener
                 let stream = device.into_event_stream().unwrap();
                 tokio::spawn(imu_listener(tx, settings, stream));
             } else {
                 let mac = device.unique_name().unwrap().to_string();
+
+                // Announce that a new device was connected
                 tx.send(ChannelData {
-                    serial_number: mac,
+                    serial_number: mac.clone(),
                     info: ChannelInfo::Connected(JoyconDesign {
                         color: "#828282".to_string(),
                         design_type: convert_design(device.input_id().product()),
                     }),
-                })
-                .unwrap();
+                }).unwrap();
+
+                // Look for the joycon in UPower
+                for upower_dev in upower.enumerate_devices().await.unwrap() {
+                    let proxy = DeviceProxy::new(&connection, upower_dev.clone()).await.unwrap();
+                    let Ok(serial) = proxy.serial().await else { continue; };
+
+                    if serial == mac {
+                        tokio::spawn(battery_listener(tx.clone(), settings.clone(), upower_dev));
+                        break;
+                    }
+                }
+
+                // Listen to events of the joycon
                 let stream = device.into_event_stream().unwrap();
                 tokio::spawn(joycon_listener(tx, settings, stream));
             }
