@@ -15,12 +15,12 @@ use std::time::Duration;
 // https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/imu_sensor_notes.md
 
 // Convert to acceleration in G
-fn acc(n: i16, offset: i16) -> f64 {
+pub fn acc(n: i16, offset: i16) -> f64 {
     let n = n.saturating_sub(offset);
     n as f64 * 0.00024414435f64 // 16000/65535/1000
 }
 // Convert to acceleration in radians/s
-fn gyro(n: i16, offset: i16, scale: f64) -> f64 {
+pub fn gyro(n: i16, offset: i16, scale: f64) -> f64 {
     n.saturating_sub(offset) as f64
     * scale
     // NOTE: 13371 is technically a value present in flash, in practice it seems to be constant.
