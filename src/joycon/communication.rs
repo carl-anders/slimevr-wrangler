@@ -67,7 +67,7 @@ pub enum ChannelInfo {
     ImuData([JoyconAxisData; 3]),
     Battery(Battery),
     Reset,
-    Disconnected
+    Disconnected,
 }
 /*
 fn serial_number_to_mac(serial: &str) -> [u8; 6] {

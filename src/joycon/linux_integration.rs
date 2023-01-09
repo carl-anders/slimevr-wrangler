@@ -1,9 +1,9 @@
 use std::{
     collections::HashSet,
-    sync::mpsc,
-    time::{Duration, SystemTime},
+    sync::{mpsc, Arc},
+    time::{Duration, SystemTime}, path::PathBuf,
 };
-use tokio::time::interval;
+use tokio::{time::interval, sync::Mutex};
 
 use evdev::{enumerate, EventStream, InputEventKind, Key};
 use tokio_stream::StreamExt;
@@ -58,6 +58,8 @@ async fn joycon_listener(
     tx: mpsc::Sender<ChannelData>,
     _settings: settings::Handler,
     mut input: EventStream,
+    path: PathBuf,
+    paths: Arc<Mutex<HashSet<PathBuf>>>
 ) {
     let mac = input.device().unique_name().unwrap().to_string(); // Joycons always have unique name
 
@@ -78,12 +80,15 @@ async fn joycon_listener(
         serial_number: mac,
         info: ChannelInfo::Disconnected
     }).unwrap();
+    paths.lock().await.remove(&path);
 }
 
 async fn imu_listener(
     tx: mpsc::Sender<ChannelData>,
     settings: settings::Handler,
     mut input: EventStream,
+    path: PathBuf,
+    paths: Arc<Mutex<HashSet<PathBuf>>>
 ) {
     let mac = input.device().unique_name().unwrap().to_string(); // Joycons always have unique name
     let mut imu_array = [JoyconAxisData {
@@ -98,8 +103,7 @@ async fn imu_listener(
     let mut sys_time = SystemTime::now();
     let mut last_event = input.device().get_abs_state().unwrap();
 
-    loop {
-        let ev = input.next_event().await.unwrap();
+    while let Ok(ev) = input.next_event().await {
         // If it's the same timestamp, just skip and remember the event
         if ev.timestamp() == sys_time {
             last_event = input.device().get_abs_state().unwrap();
@@ -133,6 +137,8 @@ async fn imu_listener(
             .unwrap();
         }
     }
+
+    paths.lock().await.remove(&path);
 }
 
 async fn battery_listener(
@@ -168,7 +174,7 @@ async fn battery_listener(
 #[tokio::main]
 pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Handler) {
     let mut slow_stream = interval(Duration::from_secs(2));
-    let mut paths = HashSet::new();
+    let paths = Arc::new(Mutex::new(HashSet::new()));
     let connection = zbus::Connection::system().await.unwrap();
     let upower = UPowerProxy::new(&connection).await.unwrap();
 
@@ -178,7 +184,7 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
         for (path, mut device) in enumerate() {
             // Check if device is a nintendo one or it's already in the paths hashset
             // then check if its any of the supported switch joysticks
-            if (device.input_id().vendor() != USB_VENDOR_ID_NINTENDO || paths.contains(&path))
+            if (device.input_id().vendor() != USB_VENDOR_ID_NINTENDO || paths.lock().await.contains(&path))
                 || (device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONL
                     && device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONR
                     && device.input_id().product() != USB_DEVICE_ID_NINTENDO_PROCON
@@ -195,7 +201,7 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
                 continue;
             }
 
-            paths.insert(path);
+            paths.lock().await.insert(path.clone());
             let tx = tx.clone();
             let settings = settings.clone();
 
@@ -204,7 +210,7 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
             if device.name().unwrap().contains("IMU") {
                 // Make IMU event listener
                 let stream = device.into_event_stream().unwrap();
-                tokio::spawn(imu_listener(tx, settings, stream));
+                tokio::spawn(imu_listener(tx, settings, stream, path, paths.clone()));
             } else {
                 let mac = device.unique_name().unwrap().to_string();
 
@@ -233,7 +239,7 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
 
                 // Listen to events of the joycon
                 let stream = device.into_event_stream().unwrap();
-                tokio::spawn(joycon_listener(tx, settings, stream));
+                tokio::spawn(joycon_listener(tx, settings, stream, path, paths.clone()));
             }
         }
     }
