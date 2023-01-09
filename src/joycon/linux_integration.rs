@@ -36,7 +36,7 @@ const USB_DEVICE_ID_NINTENDO_CHRGGRIP: u16 = 0x200E;
 fn convert_design(product_code: u16) -> JoyconDesignType {
     match product_code {
         USB_DEVICE_ID_NINTENDO_JOYCONL | USB_DEVICE_ID_NINTENDO_PROCON => JoyconDesignType::Left,
-        USB_DEVICE_ID_NINTENDO_JOYCONR => JoyconDesignType::Right,
+        USB_DEVICE_ID_NINTENDO_JOYCONR | USB_DEVICE_ID_NINTENDO_CHRGGRIP => JoyconDesignType::Right,
         _ => unreachable!(),
     }
 }
@@ -66,7 +66,8 @@ async fn joycon_listener(
                 tx.send(ChannelData {
                     serial_number: mac.clone(),
                     info: ChannelInfo::Reset,
-                }).unwrap();
+                })
+                .unwrap();
             }
         }
     }
@@ -121,7 +122,8 @@ async fn imu_listener(
             tx.send(ChannelData {
                 serial_number: mac.clone(),
                 info: ChannelInfo::ImuData(imu_array),
-            }).unwrap();
+            })
+            .unwrap();
         }
     }
 }
@@ -139,7 +141,8 @@ async fn battery_listener(
     tx.send(ChannelData {
         serial_number: mac.clone(),
         info: ChannelInfo::Battery(level),
-    }).unwrap();
+    })
+    .unwrap();
 
     let mut stream = device.receive_battery_level_changed().await;
 
@@ -149,15 +152,13 @@ async fn battery_listener(
         tx.send(ChannelData {
             serial_number: mac.clone(),
             info: ChannelInfo::Battery(level),
-        }).unwrap();
+        })
+        .unwrap();
     }
 }
 
 #[tokio::main]
-pub async fn spawn_thread(
-    tx: mpsc::Sender<ChannelData>,
-    settings: settings::Handler,
-) {
+pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Handler) {
     let mut slow_stream = interval(Duration::from_secs(5));
     let mut paths = HashSet::new();
     let connection = zbus::Connection::system().await.unwrap();
@@ -172,14 +173,15 @@ pub async fn spawn_thread(
             if (device.input_id().vendor() != USB_VENDOR_ID_NINTENDO || paths.contains(&path))
                 || (device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONL
                     && device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONR
-                    && device.input_id().product() != USB_DEVICE_ID_NINTENDO_PROCON)
+                    && device.input_id().product() != USB_DEVICE_ID_NINTENDO_PROCON
+                    && device.input_id().product() != USB_DEVICE_ID_NINTENDO_CHRGGRIP)
             {
                 continue;
             }
 
             if device.grab().is_err() {
                 println!(
-                    "Joycon {:?} was grabbed by someone else already.",
+                    "Joycon {:?} is in use by another program.",
                     device.unique_name()
                 );
                 continue;
@@ -191,7 +193,7 @@ pub async fn spawn_thread(
 
             // The device name is defined on all nintendo devices in the kernel,
             // so unwrap shouldn't fail...
-            if device.name().unwrap().ends_with("IMU") {
+            if device.name().unwrap().contains("IMU") {
                 // Make IMU event listener
                 let stream = device.into_event_stream().unwrap();
                 tokio::spawn(imu_listener(tx, settings, stream));
@@ -205,11 +207,14 @@ pub async fn spawn_thread(
                         color: "#828282".to_string(),
                         design_type: convert_design(device.input_id().product()),
                     }),
-                }).unwrap();
+                })
+                .unwrap();
 
                 // Look for the joycon in UPower
                 for upower_dev in upower.enumerate_devices().await.unwrap() {
-                    let proxy = DeviceProxy::new(&connection, upower_dev.clone()).await.unwrap();
+                    let proxy = DeviceProxy::new(&connection, upower_dev.clone())
+                        .await
+                        .unwrap();
                     let Ok(serial) = proxy.serial().await else { continue; };
 
                     if serial == mac {
