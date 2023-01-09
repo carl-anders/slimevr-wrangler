@@ -2,9 +2,11 @@ use std::{env, sync::mpsc};
 
 use crate::settings;
 
+#[cfg(target_os = "linux")]
+use super::linux_integration;
 use super::{
-    communication::ServerStatus, linux_integration, spawn_thread,
-    test_integration::test_controllers, Communication, Status,
+    communication::ServerStatus, spawn_thread, test_integration::test_controllers, Communication,
+    Status,
 };
 
 pub struct Wrapper {
@@ -25,7 +27,12 @@ impl Wrapper {
         if env::args().any(|a| &a == "test") {
             std::thread::spawn(move || test_controllers(tx_clone));
         }
+
+        #[cfg(target_os = "linux")]
         std::thread::spawn(move || linux_integration::spawn_thread(tx, settings_clone));
+        #[cfg(not(target_os = "linux"))]
+        std::thread::spawn(move || spawn_thread(tx, settings_clone));
+        
         Self {
             status_rx,
             server_rx,
