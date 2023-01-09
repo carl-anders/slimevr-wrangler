@@ -149,7 +149,8 @@ async fn battery_listener(
 
     let mut stream = device.receive_battery_level_changed().await;
 
-    if let Some(battery) = stream.next().await {
+    
+    while let Some(battery) = stream.next().await {
         let level = convert_battery(battery.get().await.unwrap());
 
         tx.send(ChannelData {
@@ -162,13 +163,13 @@ async fn battery_listener(
 
 #[tokio::main]
 pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Handler) {
-    let mut slow_stream = interval(Duration::from_secs(5));
+    let mut slow_stream = interval(Duration::from_secs(2));
     let mut paths = HashSet::new();
     let connection = zbus::Connection::system().await.unwrap();
     let upower = UPowerProxy::new(&connection).await.unwrap();
 
     loop {
-        // Wait 5 seconds for enumerating
+        // Wait 2 seconds for enumerating
         slow_stream.tick().await;
         for (path, mut device) in enumerate() {
             // Check if device is a nintendo one or it's already in the paths hashset
