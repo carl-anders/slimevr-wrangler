@@ -61,10 +61,9 @@ async fn joycon_listener(
 ) {
     let mac = input.device().unique_name().unwrap().to_string(); // Joycons always have unique name
 
-    loop {
-        let ev = input.next_event().await.unwrap();
-
+    while let Ok(ev) = input.next_event().await {
         if let InputEventKind::Key(key) = ev.kind() {
+            // if DPAD_UP or BTN_SOUTH and button is lifted
             if (key == Key::BTN_DPAD_UP || key == Key::BTN_SOUTH) && ev.value() == 0 {
                 tx.send(ChannelData {
                     serial_number: mac.clone(),
@@ -74,6 +73,11 @@ async fn joycon_listener(
             }
         }
     }
+
+    tx.send(ChannelData {
+        serial_number: mac,
+        info: ChannelInfo::Disconnected
+    }).unwrap();
 }
 
 async fn imu_listener(
