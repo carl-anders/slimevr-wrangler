@@ -77,15 +77,19 @@ async fn imu_listener(
     }; 3];
     let mut count = 0;
     let mut sys_time = SystemTime::now();
+    let mut last_event = input.device().get_abs_state().unwrap();
     loop {
         let ev = input.next_event().await.unwrap();
         if ev.timestamp() == sys_time {
+            last_event = input.device().get_abs_state().unwrap();
             continue;
         }
         sys_time = ev.timestamp();
 
         let gyro_scale_factor = settings.load().joycon_scale_get(&mac);
-        let axis = input.device().get_abs_state().unwrap();
+        let axis = last_event;
+        last_event = input.device().get_abs_state().unwrap();
+
         let accel_axis = &axis[..3];
         let gyro_axis = &axis[3..6];
         imu_array[count] = JoyconAxisData {
@@ -96,7 +100,6 @@ async fn imu_listener(
             gyro_y: gyro(gyro_axis[1].value, gyro_scale_factor),
             gyro_z: gyro(gyro_axis[2].value, gyro_scale_factor),
         };
-        println!("{:?}", imu_array[count]);
         count += 1;
         if count == 3 {
             count = 0;
