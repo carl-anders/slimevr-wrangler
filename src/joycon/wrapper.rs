@@ -3,8 +3,8 @@ use std::{env, sync::mpsc};
 use crate::settings;
 
 use super::{
-    communication::ServerStatus, spawn_thread, test_integration::test_controllers, Communication,
-    Status,
+    communication::ServerStatus, linux_integration, spawn_thread,
+    test_integration::test_controllers, Communication, Status,
 };
 
 pub struct Wrapper {
@@ -25,7 +25,7 @@ impl Wrapper {
         if env::args().any(|a| &a == "test") {
             std::thread::spawn(move || test_controllers(tx_clone));
         }
-        std::thread::spawn(move || spawn_thread(tx, settings_clone));
+        std::thread::spawn(move || linux_integration::spawn_thread(tx, settings_clone));
         Self {
             status_rx,
             server_rx,

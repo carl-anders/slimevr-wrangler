@@ -33,7 +33,6 @@ async fn joycon_listener(
     mut input: EventStream,
 ) {
     let mac = input.device().unique_name().unwrap().to_string(); // Joycons always have unique name
-    let device_type = convert_design(input.device().input_id().product());
     let battery = Battery::Full; // can be fetched with upower
     loop {
         let ev = input.next_event().await.unwrap();
@@ -99,11 +98,10 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
     loop {
         slow_stream.tick().await;
         for (path, mut device) in enumerate() {
-            if device.input_id().vendor() != USB_VENDOR_ID_NINTENDO
-                || device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONL
-                || device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONR
-                || device.input_id().product() != USB_DEVICE_ID_NINTENDO_PROCON
-                || paths.contains(&path)
+            if (device.input_id().vendor() != USB_VENDOR_ID_NINTENDO || paths.contains(&path))
+                || (device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONL
+                    && device.input_id().product() != USB_DEVICE_ID_NINTENDO_JOYCONR
+                    && device.input_id().product() != USB_DEVICE_ID_NINTENDO_PROCON)
             {
                 continue;
             }
