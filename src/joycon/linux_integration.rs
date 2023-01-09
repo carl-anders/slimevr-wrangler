@@ -19,9 +19,7 @@ fn acc(n: i32) -> f64 {
     n as f64 * (1f64 / 4096f64) // JC_IMU_ACCEL_RES_PER_G
 }
 fn gyro(n: i32, scale: f64) -> f64 {
-    (n as f64 / 1000f64 // Value is scaled in gyro by 1000
-        * scale
-        / 14.247f64) // JC_IMU_GYRO_RES_PER_DPS
+    (n as f64 * scale / 14247f64) // JC_IMU_GYRO_RES_PER_DPS
         .to_radians()
 }
 
