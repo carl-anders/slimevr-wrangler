@@ -26,7 +26,10 @@ fn gyro(n: i32, scale: f64) -> f64 {
 }
 
 const USB_VENDOR_ID_NINTENDO: u16 = 0x057e;
+// Soon™️
+#[allow(dead_code)]
 const USB_DEVICE_ID_NINTENDO_WIIMOTE: u16 = 0x0306;
+#[allow(dead_code)]
 const USB_DEVICE_ID_NINTENDO_WIIMOTE2: u16 = 0x0330;
 const USB_DEVICE_ID_NINTENDO_JOYCONL: u16 = 0x2006;
 const USB_DEVICE_ID_NINTENDO_JOYCONR: u16 = 0x2007;
