@@ -16,13 +16,13 @@ use super::{
 // Resolution definitions from hid-nintendo.c from linux:
 // https://github.com/torvalds/linux/blob/master/drivers/hid/hid-nintendo.c
 fn acc(n: i32) -> f64 {
-    n as f64 * (1f64/4096f64) // JC_IMU_ACCEL_RES_PER_G
+    n as f64 * (1f64 / 4096f64) // JC_IMU_ACCEL_RES_PER_G
 }
 fn gyro(n: i32, scale: f64) -> f64 {
     (n as f64 / 1000f64 // Value is scaled in gyro by 1000
         * scale
         / 14.247f64) // JC_IMU_GYRO_RES_PER_DPS
-            .to_radians()
+        .to_radians()
 }
 
 const USB_VENDOR_ID_NINTENDO: u16 = 0x057e;
@@ -62,7 +62,6 @@ async fn joycon_listener(
         }
     }
 }
-
 
 async fn imu_listener(
     tx: mpsc::Sender<ChannelData>,
