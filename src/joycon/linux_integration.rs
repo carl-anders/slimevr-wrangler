@@ -7,9 +7,20 @@ use crate::settings;
 
 use super::{
     imu::JoyconAxisData,
-    integration::{acc, gyro},
     Battery, ChannelData, ChannelInfo, JoyconDesign, JoyconDesignType,
 };
+
+// Resolution definitions from hid-nintendo.c from linux:
+// https://github.com/torvalds/linux/blob/master/drivers/hid/hid-nintendo.c
+fn acc(n: i32) -> f64 {
+    n as f64 / 4096f64 // JC_IMU_ACCEL_RES_PER_G
+}
+fn gyro(n: i32, scale: f64) -> f64 {
+  n as f64
+  * scale
+  / 14247f64 // JC_IMU_GYRO_RES_PER_DPS
+  .to_radians()
+}
 
 const USB_VENDOR_ID_NINTENDO: u16 = 0x057e;
 const USB_DEVICE_ID_NINTENDO_WIIMOTE: u16 = 0x0306;
@@ -71,12 +82,12 @@ async fn imu_listener(
         let accel_axis = &axis[..3];
         let gyro_axis = &axis[3..6];
         imu_array[count] = JoyconAxisData {
-            accel_x: acc(accel_axis[0].value as i16, 0),
-            accel_y: acc(accel_axis[1].value as i16, 0),
-            accel_z: acc(accel_axis[2].value as i16, 0),
-            gyro_x: gyro(gyro_axis[0].value as i16, 0, gyro_scale_factor),
-            gyro_y: gyro(gyro_axis[1].value as i16, 0, gyro_scale_factor),
-            gyro_z: gyro(gyro_axis[2].value as i16, 0, gyro_scale_factor),
+            accel_x: acc(accel_axis[0].value as i32),
+            accel_y: acc(accel_axis[1].value as i32),
+            accel_z: acc(accel_axis[2].value as i32),
+            gyro_x: gyro(gyro_axis[0].value as i32, gyro_scale_factor),
+            gyro_y: gyro(gyro_axis[1].value as i32, gyro_scale_factor),
+            gyro_z: gyro(gyro_axis[2].value as i32, gyro_scale_factor),
         };
 
         count += 1;
