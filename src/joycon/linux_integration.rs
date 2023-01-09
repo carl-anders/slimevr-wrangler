@@ -1,4 +1,8 @@
-use std::{collections::HashSet, sync::mpsc, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::mpsc,
+    time::{Duration, SystemTime},
+};
 use tokio::time::{interval, sleep};
 
 use evdev::{enumerate, Device, EventStream, InputEventKind, Key};
@@ -6,20 +10,19 @@ use evdev::{enumerate, Device, EventStream, InputEventKind, Key};
 use crate::settings;
 
 use super::{
-    imu::JoyconAxisData,
-    Battery, ChannelData, ChannelInfo, JoyconDesign, JoyconDesignType,
+    imu::JoyconAxisData, Battery, ChannelData, ChannelInfo, JoyconDesign, JoyconDesignType,
 };
 
 // Resolution definitions from hid-nintendo.c from linux:
 // https://github.com/torvalds/linux/blob/master/drivers/hid/hid-nintendo.c
 fn acc(n: i32) -> f64 {
-    n as f64 / 4096f64 // JC_IMU_ACCEL_RES_PER_G
+    n as f64 * (1f64/4096f64) // JC_IMU_ACCEL_RES_PER_G
 }
 fn gyro(n: i32, scale: f64) -> f64 {
-  n as f64
-  * scale
-  / 14247f64 // JC_IMU_GYRO_RES_PER_DPS
-  .to_radians()
+    (n as f64 / 1000f64 // Value is scaled in gyro by 1000
+        * scale
+        / 14.247f64) // JC_IMU_GYRO_RES_PER_DPS
+            .to_radians()
 }
 
 const USB_VENDOR_ID_NINTENDO: u16 = 0x057e;
@@ -60,6 +63,7 @@ async fn joycon_listener(
     }
 }
 
+
 async fn imu_listener(
     tx: mpsc::Sender<ChannelData>,
     settings: settings::Handler,
@@ -75,9 +79,14 @@ async fn imu_listener(
         gyro_z: 0.0,
     }; 3];
     let mut count = 0;
+    let mut sys_time = SystemTime::now();
     loop {
-        let _ev = input.next_event().await.unwrap();
-        println!("{:?}", _ev.timestamp());
+        let ev = input.next_event().await.unwrap();
+        if ev.timestamp() == sys_time {
+            continue;
+        }
+        sys_time = ev.timestamp();
+
         let gyro_scale_factor = settings.load().joycon_scale_get(&mac);
         let axis = input.device().get_abs_state().unwrap();
         let accel_axis = &axis[..3];
@@ -90,7 +99,7 @@ async fn imu_listener(
             gyro_y: gyro(gyro_axis[1].value, gyro_scale_factor),
             gyro_z: gyro(gyro_axis[2].value, gyro_scale_factor),
         };
-
+        println!("{:?}", imu_array[count]);
         count += 1;
         if count == 3 {
             count = 0;

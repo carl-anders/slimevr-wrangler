@@ -36,7 +36,7 @@ impl Wrapper {
             std::thread::spawn(move || linux_integration::spawn_thread(tx, settings_clone));
         }
         std::thread::spawn(move || spawn_thread(tx, settings_clone));
-        
+
         Self {
             status_rx,
             server_rx,
