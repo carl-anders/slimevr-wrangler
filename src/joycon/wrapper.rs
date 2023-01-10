@@ -2,6 +2,8 @@ use std::{env, sync::mpsc};
 
 use crate::settings;
 
+#[cfg(target_os = "linux")]
+use super::linux_integration;
 use super::{
     communication::ServerStatus, spawn_thread, test_integration::test_controllers, Communication,
     Status,
@@ -25,7 +27,16 @@ impl Wrapper {
         if env::args().any(|a| &a == "test") {
             std::thread::spawn(move || test_controllers(tx_clone));
         }
+
+        // evdev integration
+        #[cfg(target_os = "linux")]
+        {
+            let tx = tx.clone();
+            let settings_clone = settings_clone.clone();
+            std::thread::spawn(move || linux_integration::spawn_thread(tx, settings_clone));
+        }
         std::thread::spawn(move || spawn_thread(tx, settings_clone));
+
         Self {
             status_rx,
             server_rx,
