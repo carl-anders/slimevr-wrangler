@@ -4121,8 +4121,9 @@ checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "upower_dbus"
-version = "0.3.1"
-source = "git+https://github.com/ImUrX/upower-dbus.git?branch=patch-1#0e9efb88ef58ca0a3bd3af0e0daa3b728cf4b252"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0b1d77de98ab2e5187f5fa2b045b8c4eecfc49e5ccd07f16f4c89f008116f8c"
 dependencies = [
  "serde",
  "serde_repr",

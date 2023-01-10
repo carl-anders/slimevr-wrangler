@@ -42,7 +42,7 @@ winres = "0.1"
 
 [target.'cfg(target_os="linux")'.dependencies]
 evdev = { version = "0.12", features = ["tokio"] }
-upower_dbus = { git = "https://github.com/ImUrX/upower-dbus.git", branch = "patch-1" }
+upower_dbus = "0.3.2"
 zbus = { version = "3", default-features = false, features = ["tokio"] }
 
 [profile.release]
