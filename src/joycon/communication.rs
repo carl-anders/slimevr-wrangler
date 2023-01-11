@@ -273,7 +273,9 @@ impl Communication {
     pub fn main_loop(&mut self) {
         let mut buf = [0; 512];
 
-        // Spin sleeper with 1ns accuracy = don't actually spin sleep much, but set minimum windows timeout to 1ms instead of 15ms
+        // Spin sleeper with 1ns accuracy. The accuracy is backwards, it means that a request for
+        // X sleep will actually sleep for X - 1ns then spin for 1ns max.
+        // It is used here because it also sets the minimum Windows sleep time to 1ms instead of 15ms.
         let light_sleeper = spin_sleep::SpinSleeper::new(1)
             .with_spin_strategy(spin_sleep::SpinStrategy::YieldThread);
 

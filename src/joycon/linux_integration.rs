@@ -158,6 +158,17 @@ async fn battery_listener(tx: mpsc::Sender<ChannelData>, path: zbus::zvariant::O
 
 #[tokio::main]
 pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Handler) {
+    if !users::group_access_list()
+        .unwrap_or_default()
+        .iter()
+        .any(|group| group.name() == "input")
+    {
+        println!(
+            "\x1b[0;31m[ERROR]\x1b[0m Current user not in \"input\" group.
+            You need to add your user to the \"input\" group to use Wrangler."
+        );
+    }
+
     let mut slow_stream = interval(Duration::from_secs(2));
     let paths = Arc::new(Mutex::new(HashSet::new()));
     let connection = zbus::Connection::system().await.unwrap();
