@@ -66,27 +66,24 @@ fn joycon_listen_loop(
         JoyConDeviceType::JoyConR => |v| -v,
         JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => |v| v,
     };
-    let mut last_battery = BatteryLevel::Full;
+    let mut last_battery = None;
     loop {
         match standard.read_input_report() {
             Ok(report) => {
                 if report.common.input_report_id == 48 {
-                    if report.common.battery.level != last_battery {
-                        last_battery = report.common.battery.level;
-                        tx.send(ChannelData {
-                            serial_number: serial_number.clone(),
-                            info: ChannelInfo::Battery(convert_battery(last_battery)),
-                        })
+                    if Some(report.common.battery.level) != last_battery {
+                        last_battery = Some(report.common.battery.level);
+                        tx.send(ChannelData::new(
+                            serial_number.clone(),
+                            ChannelInfo::Battery(convert_battery(report.common.battery.level)),
+                        ))
                         .unwrap();
                     }
                     if report.common.pushed_buttons.contains(Buttons::Up)
                         || report.common.pushed_buttons.contains(Buttons::B)
                     {
-                        tx.send(ChannelData {
-                            serial_number: serial_number.clone(),
-                            info: ChannelInfo::Reset,
-                        })
-                        .unwrap();
+                        tx.send(ChannelData::new(serial_number.clone(), ChannelInfo::Reset))
+                            .unwrap();
                     }
                     let gyro_scale_factor = settings.load().joycon_scale_get(&serial_number);
                     let imu_data = report.extra.data.map(|data| JoyconAxisData {
@@ -97,14 +94,16 @@ fn joycon_listen_loop(
                         gyro_y: neg_right(gyro(data.gyro_2, calib.1[1], gyro_scale_factor)),
                         gyro_z: neg_right(gyro(data.gyro_3, calib.1[2], gyro_scale_factor)),
                     });
-                    tx.send(ChannelData {
-                        serial_number: serial_number.clone(),
-                        info: ChannelInfo::ImuData(imu_data),
-                    })
+                    tx.send(ChannelData::new(
+                        serial_number.clone(),
+                        ChannelInfo::ImuData(imu_data),
+                    ))
                     .unwrap();
                 }
             }
             Err(JoyConError::Disconnected) => {
+                tx.send(ChannelData::new(serial_number, ChannelInfo::Disconnected))
+                    .unwrap();
                 return;
             }
             _ => {}
@@ -171,10 +170,9 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Handler) 
             Err(_) => return,
         }
     };
-    #[allow(clippy::let_unit_value)]
-    let _drop = devices.iter().for_each(|d| {
+    for d in devices.iter() {
         let tx = tx.clone();
         let settings = settings.clone();
         std::thread::spawn(move || joycon_thread(d, tx, settings));
-    });
+    }
 }

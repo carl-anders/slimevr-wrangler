@@ -14,7 +14,7 @@ use super::{
     imu::{Imu, JoyconAxisData},
     JoyconDesign,
 };
-use crate::settings::{self, WranglerSettings};
+use crate::settings;
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Battery {
@@ -59,6 +59,14 @@ impl Device {
 pub struct ChannelData {
     pub serial_number: String,
     pub info: ChannelInfo,
+}
+impl ChannelData {
+    pub fn new(serial_number: String, info: ChannelInfo) -> Self {
+        Self {
+            serial_number,
+            info,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -192,14 +200,13 @@ impl Communication {
             .unwrap();
     }
 
-    fn parse_message(&mut self, msg: ChannelData, settings: &WranglerSettings) {
+    fn parse_message(&mut self, msg: ChannelData) {
         let sn = msg.serial_number;
         match msg.info {
             ChannelInfo::Connected(design) => {
                 if self.devices.contains_key(&sn) {
                     let device = self.devices.get_mut(&sn).unwrap();
                     device.imu = Imu::new();
-                    device.battery = Battery::Full;
                     return;
                 }
                 let id = self.devices.len() as _;
@@ -218,7 +225,7 @@ impl Communication {
                         device.imu.update(frame);
                     }
 
-                    let joycon_rotation = settings.joycon_rotation_get(&sn);
+                    let joycon_rotation = self.settings.load().joycon_rotation_get(&sn);
                     let rad_rotation = (joycon_rotation as f64).to_radians();
                     let rotated_quat = if joycon_rotation > 0 {
                         device.imu.rotation
@@ -261,7 +268,7 @@ impl Communication {
                 }
             }
             ChannelInfo::Reset => {
-                if settings.send_reset && self.last_reset.elapsed().as_secs() >= 2 {
+                if self.settings.load().send_reset && self.last_reset.elapsed().as_secs() >= 2 {
                     self.last_reset = Instant::now();
                     self.send_reset();
                 }
@@ -282,7 +289,6 @@ impl Communication {
         let mut last_ui_send = Instant::now();
 
         loop {
-            let settings = self.settings.load();
             if self.connected != ServerStatus::Connected
                 && self.last_handshake.elapsed().as_secs() >= 3
             {
@@ -320,9 +326,10 @@ impl Communication {
             let messages: Vec<_> = self.receive.try_iter().collect();
             if !messages.is_empty() || last_ui_send.elapsed().as_millis() > 100 {
                 for msg in messages {
-                    self.parse_message(msg, &settings);
+                    self.parse_message(msg);
                 }
 
+                let settings = self.settings.load();
                 last_ui_send = Instant::now();
                 let mut statuses = Vec::new();
                 for (serial_number, device) in &self.devices {

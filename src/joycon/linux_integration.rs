@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::{mpsc, Arc},
     time::{Duration, SystemTime},
 };
@@ -163,14 +163,13 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
         .iter()
         .any(|group| group.name() == "input")
     {
-        println!(
-            "\x1b[0;31m[ERROR]\x1b[0m Current user not in \"input\" group.
-            You need to add your user to the \"input\" group to use Wrangler."
-        );
+        println!("\x1b[0;31m[ERROR]\x1b[0m Current user not in \"input\" group.");
+        println!("You need to add your user to the \"input\" group to use Wrangler.");
     }
 
     let mut slow_stream = interval(Duration::from_secs(2));
     let paths = Arc::new(Mutex::new(HashSet::new()));
+    let mut battery_macs = HashMap::new();
     let connection = zbus::Connection::system().await.unwrap();
     let upower = UPowerProxy::new(&connection).await.unwrap();
 
@@ -225,19 +224,6 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
                 })
                 .unwrap();
 
-                // Look for the joycon in UPower
-                for upower_dev in upower.enumerate_devices().await.unwrap() {
-                    let proxy = DeviceProxy::new(&connection, upower_dev.clone())
-                        .await
-                        .unwrap();
-                    let Ok(serial) = proxy.serial().await else { continue; };
-
-                    if serial == mac {
-                        tokio::spawn(battery_listener(tx.clone(), upower_dev));
-                        break;
-                    }
-                }
-
                 // Listen to events of the joycon
                 let stream = device.into_event_stream().unwrap();
 
@@ -246,6 +232,24 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
                     joycon_listener(tx, stream).await;
                     paths.lock().await.remove(&path);
                 });
+
+                // Add to battery_macs if not already there
+                battery_macs.entry(mac).or_insert(true);
+            }
+        }
+        if battery_macs.iter().any(|(_, v)| *v) {
+            // There are joycon batteries we aren't listening to. Look for them in UPower
+            for upower_dev in upower.enumerate_devices().await.unwrap() {
+                let proxy = DeviceProxy::new(&connection, upower_dev.clone())
+                    .await
+                    .unwrap();
+                let Ok(serial) = proxy.serial().await else { continue; };
+
+                if *battery_macs.get(&serial).unwrap_or(&false) {
+                    *battery_macs.get_mut(&serial).unwrap() = false;
+                    tokio::spawn(battery_listener(tx.clone(), upower_dev));
+                    break;
+                }
             }
         }
     }
