@@ -18,24 +18,30 @@ impl Wrapper {
         let (status_tx, status_rx) = mpsc::channel();
         let (server_tx, server_rx) = mpsc::channel();
         let (tx, rx) = mpsc::channel();
-        let settings_clone = settings.clone();
-        std::thread::spawn(move || {
-            Communication::start(rx, status_tx, server_tx, settings);
-        });
 
-        let tx_clone = tx.clone();
-        if env::args().any(|a| &a == "test") {
-            std::thread::spawn(move || test_controllers(tx_clone));
+        {
+            let settings = settings.clone();
+            std::thread::spawn(move || {
+                Communication::start(rx, status_tx, server_tx, settings);
+            });
+        }
+
+        {
+            let tx = tx.clone();
+            if env::args().any(|a| &a == "test") {
+                std::thread::spawn(move || test_controllers(tx));
+            }
         }
 
         // evdev integration
         #[cfg(target_os = "linux")]
         {
             let tx = tx.clone();
-            let settings_clone = settings_clone.clone();
-            std::thread::spawn(move || linux_integration::spawn_thread(tx, settings_clone));
+            let settings = settings.clone();
+            std::thread::spawn(move || linux_integration::spawn_thread(tx, settings));
         }
-        std::thread::spawn(move || spawn_thread(tx, settings_clone));
+
+        std::thread::spawn(move || spawn_thread(tx, settings));
 
         Self {
             status_rx,
