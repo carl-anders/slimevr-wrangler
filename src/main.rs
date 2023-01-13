@@ -8,12 +8,14 @@ use iced::{
         button, canvas, checkbox, container, horizontal_space, scrollable, slider, text,
         text_input, Column, Container, Row, Svg,
     },
-    window, Alignment, Application, Command, Element, Font, Length, Settings, Subscription,
+    window, Alignment, Application, Color, Command, Element, Font, Length, Settings, Subscription,
 };
 
+use circle::circle;
 use itertools::Itertools;
-use joycon::{Battery, ServerStatus};
+use joycon::{Battery, DeviceStatus, ServerStatus};
 use needle::Needle;
+use settings::WranglerSettings;
 use std::{
     io::{
         self,
@@ -25,6 +27,7 @@ use std::{
 mod joycon;
 mod steam_blacklist;
 use steam_blacklist as blacklist;
+mod circle;
 mod needle;
 mod settings;
 mod style;
@@ -84,8 +87,7 @@ enum Message {
 #[derive(Default)]
 struct MainState {
     joycon: Option<joycon::Wrapper>,
-    joycon_boxes: Vec<JoyconBox>,
-    joycon_svg: joycon::Svg,
+    joycon_boxes: JoyconBoxes,
     num_columns: usize,
     search_dots: usize,
     settings_show: bool,
@@ -95,7 +97,6 @@ struct MainState {
     settings: settings::Handler,
     update_found: Option<String>,
     blacklist_info: blacklist::BlacklistResult,
-    needles: Vec<Needle>,
 }
 impl Application for MainState {
     type Executor = executor::Default;
@@ -106,14 +107,10 @@ impl Application for MainState {
     fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
         let mut new = Self {
             num_columns: 3,
-            joycon_svg: joycon::Svg::new(),
             ..Self::default()
         };
         new.joycon = Some(joycon::Wrapper::new(new.settings.clone()));
         new.server_address = format!("{}", new.settings.load().get_socket_address());
-        for i in 0..360 {
-            new.needles.push(Needle::new(i));
-        }
         (
             new,
             Command::batch(vec![
@@ -145,17 +142,8 @@ impl Application for MainState {
             Message::EventOccurred(_) => {}
             Message::Tick(_time) => {
                 if let Some(ref ji) = self.joycon {
-                    if let Some(mut res) = ji.poll_status() {
-                        if res.len() == self.joycon_boxes.len() {
-                            for i in 0..self.joycon_boxes.len() {
-                                self.joycon_boxes[i].status = res.remove(0);
-                            }
-                        } else {
-                            self.joycon_boxes = Vec::new();
-                            for _ in 0..res.len() {
-                                self.joycon_boxes.push(JoyconBox::new(res.remove(0)));
-                            }
-                        }
+                    if let Some(res) = ji.poll_status() {
+                        self.joycon_boxes.statuses = res;
                     }
                     if let Some(connected) = ji.poll_server() {
                         self.server_connected = connected;
@@ -227,16 +215,7 @@ impl Application for MainState {
                 ));
             container(all_settings).padding(20)
         } else {
-            let settings = self.settings.load();
-            let mut boxes: Vec<Container<Message>> = Vec::new();
-            for joycon_box in &self.joycon_boxes {
-                let scale = settings.joycon_scale_get(&joycon_box.status.serial_number);
-                boxes.push(
-                    contain(joycon_box.view(&self.joycon_svg, scale, &self.needles))
-                        .style(style::item_normal as for<'r> fn(&'r _) -> _),
-                );
-            }
-
+            let boxes = self.joycon_boxes.view(&self.settings.load());
             let list = float_list(self.num_columns, boxes).push(
                     text(format!(
                         "Searching for Joycon controllers{search_dots}\n\
@@ -265,15 +244,6 @@ impl Application for MainState {
     }
 }
 
-fn contain<'a, M: 'a, T>(content: T) -> Container<'a, M>
-where
-    T: Into<Element<'a, M>>,
-{
-    container(content)
-        .height(Length::Units(300))
-        .width(Length::Units(300))
-        .padding(10)
-}
 fn float_list(columns: usize, boxes: Vec<Container<'_, Message>>) -> Column<'_, Message> {
     let mut list = Column::new().padding(20).spacing(20).width(Length::Fill);
     for chunk in &boxes.into_iter().chunks(columns) {
@@ -375,95 +345,145 @@ fn bottom_bar<'a>(
         .style(style::container_info as for<'r> fn(&'r _) -> _)
 }
 
-#[derive(Debug, Clone)]
-struct JoyconBox {
-    pub status: joycon::Status,
+#[derive(Debug)]
+struct JoyconBoxes {
+    pub statuses: Vec<joycon::Status>,
+    svg_handler: joycon::Svg,
+    needles: Vec<Needle>,
 }
 
-impl JoyconBox {
-    const fn new(status: joycon::Status) -> Self {
-        Self { status }
+impl Default for JoyconBoxes {
+    fn default() -> Self {
+        Self {
+            statuses: vec![],
+            svg_handler: joycon::Svg::new(),
+            needles: (0..360).into_iter().map(Needle::new).collect(),
+        }
     }
-    fn view<'a>(
-        &'a self,
-        svg_handler: &joycon::Svg,
-        scale: f64,
-        needles: &'a [Needle],
-    ) -> Column<Message> {
-        let sn = self.status.serial_number.clone();
+}
 
-        let buttons = Row::new()
-            .spacing(10)
-            .push(
-                button(text("↺").font(ICONS))
-                    .on_press(Message::JoyconRotate(sn.clone(), false))
-                    .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
-            )
-            .push(
-                button(text("↻").font(ICONS))
-                    .on_press(Message::JoyconRotate(sn.clone(), true))
-                    .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
-            );
+impl JoyconBoxes {
+    fn view<'a>(&'a self, settings: &WranglerSettings) -> Vec<Container<'a, Message>> {
+        self.statuses
+            .iter()
+            .map(|status| {
+                container(single_box_view(
+                    status,
+                    &self.svg_handler,
+                    &self.needles,
+                    settings.joycon_scale_get(&status.serial_number),
+                    settings.joycon_rotation_get(&status.serial_number),
+                ))
+                .height(Length::Units(335))
+                .width(Length::Units(300))
+                .padding(10)
+                .style(style::item_normal as for<'r> fn(&'r _) -> _)
+            })
+            .collect()
+    }
+}
 
-        let svg = Svg::new(svg_handler.get(&self.status.design, self.status.mount_rotation));
+fn single_box_view<'a>(
+    status: &joycon::Status,
+    svg_handler: &joycon::Svg,
+    needles: &'a [Needle],
+    scale: f64,
+    mount_rot: i32,
+) -> Column<'a, Message> {
+    let sn = status.serial_number.clone();
 
-        let left = Column::new()
-            .spacing(10)
-            .align_items(Alignment::Center)
-            .push(buttons)
-            .push(svg)
-            .width(Length::Units(140));
-
-        let rot = self.status.rotation;
-        let values = Row::with_children(
-            [("Roll", rot.0), ("Pitch", rot.1), ("Yaw", -rot.2)]
-                .iter()
-                .map(|(name, val)| {
-                    let ival = (*val as i32).rem_euclid(360) as usize;
-                    let needle = needles.get(ival).unwrap_or_else(|| &needles[0]);
-
-                    Column::new()
-                        .push(text(name))
-                        .push(
-                            canvas(needle)
-                                .width(Length::Units(25))
-                                .height(Length::Units(25)),
-                        )
-                        .push(text(format!("{ival}")))
-                        .spacing(10)
-                        .align_items(Alignment::Center)
-                        .width(Length::Fill)
-                        .into()
-                })
-                .collect(),
+    let buttons = Row::new()
+        .spacing(10)
+        .push(
+            button(text("↺").font(ICONS))
+                .on_press(Message::JoyconRotate(sn.clone(), false))
+                .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
+        )
+        .push(
+            button(text("↻").font(ICONS))
+                .on_press(Message::JoyconRotate(sn.clone(), true))
+                .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
         );
 
-        let top = Row::new()
-            .spacing(10)
-            .push(left)
-            .push(values)
-            .height(Length::Units(150));
+    let svg = Svg::new(svg_handler.get(&status.design, mount_rot));
 
-        let battery_text = container(text(format!("{:?}", self.status.battery))).style(match self
-            .status
-            .battery
-        {
+    let left = Column::new()
+        .spacing(10)
+        .align_items(Alignment::Center)
+        .push(buttons)
+        .push(svg)
+        .width(Length::Units(130));
+
+    let rot = status.rotation;
+    let values = Row::with_children(
+        [("Roll", rot.0), ("Pitch", rot.1), ("Yaw", -rot.2)]
+            .iter()
+            .map(|(name, val)| {
+                let ival = (*val as i32).rem_euclid(360) as usize;
+                let needle = needles.get(ival).unwrap_or_else(|| &needles[0]);
+
+                Column::new()
+                    .push(text(name))
+                    .push(
+                        canvas(needle)
+                            .width(Length::Units(25))
+                            .height(Length::Units(25)),
+                    )
+                    .push(text(format!("{ival}")))
+                    .spacing(10)
+                    .align_items(Alignment::Center)
+                    .width(Length::Fill)
+                    .into()
+            })
+            .collect(),
+    );
+
+    let circle = circle(
+        8.0,
+        match status.status {
+            DeviceStatus::Disconnected | DeviceStatus::NoIMU => Color::from_rgb8(0xff, 0x38, 0x4A),
+            DeviceStatus::LaggyIMU => Color::from_rgb8(0xff, 0xe3, 0x3c),
+            DeviceStatus::Healthy => Color::from_rgb8(0x3d, 0xff, 0x81),
+        },
+    );
+
+    let top = Row::new()
+        .spacing(5)
+        .push(circle)
+        .push(left)
+        .push(values)
+        .height(Length::Units(150));
+
+    let battery_text =
+        container(text(format!("{:?}", status.battery))).style(match status.battery {
             Battery::Empty | Battery::Critical => style::text_orange,
             Battery::Low => style::text_yellow,
             Battery::Medium | Battery::Full => style::text_green,
         });
-        let bottom = Column::new()
-            .spacing(10)
-            .push(
-                slider(0.8..=1.2, scale, move |c| {
-                    Message::JoyconScale(sn.clone(), c)
-                })
-                .step(0.001),
-            )
-            .push(text(format!("Rotation scale ratio: {scale:.3}")))
-            .push(text("Change this if the tracker in vr moves less or more than your irl joycon. Higher value = more movement.").size(14))
-            .push(Row::new().push(text("Battery level: ")).push(battery_text));
 
-        Column::new().spacing(10).push(top).push(bottom)
-    }
+    let status_text = container(text(format!("{}", status.status))).style(match status.status {
+        DeviceStatus::Disconnected | DeviceStatus::NoIMU => style::text_orange,
+        DeviceStatus::LaggyIMU => style::text_yellow,
+        DeviceStatus::Healthy => style::text_green,
+    });
+
+    let bottom = Column::new()
+        .spacing(10)
+        .push(
+            slider(0.8..=1.2, scale, move |c| {
+                Message::JoyconScale(sn.clone(), c)
+            })
+            .step(0.001),
+        )
+        .push(text(format!("Rotation scale ratio: {scale:.3}")))
+        .push(
+            text(
+                "Change this if the tracker in vr moves less or more than your irl joycon. Higher value = more movement.",
+            )
+            .size(14),
+        )
+        .push(Row::new().push(text("Battery level: ")).push(battery_text))
+        .push(Row::new().push(text("Status: ")).push(status_text));
+
+    Column::new().spacing(10).push(top).push(bottom)
 }

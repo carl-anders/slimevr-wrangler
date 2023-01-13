@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Display,
     net::{SocketAddr, UdpSocket},
     sync::mpsc,
     time::{Duration, Instant},
@@ -29,9 +30,28 @@ pub enum Battery {
 pub struct Status {
     pub rotation: (f64, f64, f64),
     pub design: JoyconDesign,
-    pub mount_rotation: i32,
     pub serial_number: String,
     pub battery: Battery,
+    pub status: DeviceStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DeviceStatus {
+    Healthy,
+    LaggyIMU,
+    NoIMU,
+    Disconnected,
+}
+
+impl Display for DeviceStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            DeviceStatus::Healthy => "Healthy",
+            DeviceStatus::LaggyIMU => "Laggy IMU",
+            DeviceStatus::NoIMU => "No IMU",
+            DeviceStatus::Disconnected => "Disconnected",
+        })
+    }
 }
 
 struct Device {
@@ -39,6 +59,8 @@ struct Device {
     design: JoyconDesign,
     id: u8,
     battery: Battery,
+    status: DeviceStatus,
+    imu_times: Vec<Instant>,
 }
 
 impl Device {
@@ -207,6 +229,7 @@ impl Communication {
                 if self.devices.contains_key(&sn) {
                     let device = self.devices.get_mut(&sn).unwrap();
                     device.imu = Imu::new();
+                    device.imu_times = vec![];
                     return;
                 }
                 let id = self.devices.len() as _;
@@ -215,6 +238,8 @@ impl Communication {
                     imu: Imu::new(),
                     id,
                     battery: Battery::Full,
+                    status: DeviceStatus::NoIMU,
+                    imu_times: vec![],
                 };
                 device.handshake(&self.socket, &self.address);
                 self.devices.insert(sn, device);
@@ -224,6 +249,7 @@ impl Communication {
                     for frame in imu_data {
                         device.imu.update(frame);
                     }
+                    device.imu_times.push(Instant::now());
 
                     let joycon_rotation = self.settings.load().joycon_rotation_get(&sn);
                     let rad_rotation = (joycon_rotation as f64).to_radians();
@@ -273,7 +299,32 @@ impl Communication {
                     self.send_reset();
                 }
             }
-            ChannelInfo::Disconnected => {}
+            ChannelInfo::Disconnected => {
+                if let Some(device) = self.devices.get_mut(&sn) {
+                    device.imu_times = vec![];
+                    device.status = DeviceStatus::Disconnected;
+                }
+            }
+        }
+    }
+
+    fn update_statuses(&mut self) {
+        let discard_before = Instant::now() - Duration::from_secs(1);
+        for device in self.devices.values_mut() {
+            device.imu_times.retain(|t| t > &discard_before);
+            match device.imu_times.len() {
+                x if x >= 55 => {
+                    device.status = DeviceStatus::Healthy;
+                }
+                x if x > 0 => {
+                    device.status = DeviceStatus::LaggyIMU;
+                }
+                _ => {
+                    if device.status != DeviceStatus::Disconnected {
+                        device.status = DeviceStatus::NoIMU;
+                    }
+                }
+            }
         }
     }
 
@@ -329,16 +380,17 @@ impl Communication {
                     self.parse_message(msg);
                 }
 
-                let settings = self.settings.load();
+                self.update_statuses();
+
                 last_ui_send = Instant::now();
                 let mut statuses = Vec::new();
                 for (serial_number, device) in &self.devices {
                     statuses.push(Status {
                         rotation: device.imu.euler_angles_deg(),
                         design: device.design.clone(),
-                        mount_rotation: settings.joycon_rotation_get(serial_number),
                         serial_number: serial_number.clone(),
                         battery: device.battery,
+                        status: device.status,
                     });
                 }
                 self.status_tx.send(statuses).ok();

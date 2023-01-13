@@ -2,6 +2,7 @@ use iced::widget::canvas;
 use iced::widget::canvas::{stroke, Cache, Cursor, Geometry, LineCap, Path, Stroke};
 use iced::{Color, Point, Rectangle, Theme, Vector};
 
+#[derive(Debug)]
 pub struct Needle {
     rotation: u32,
     needle: Cache,

@@ -35,7 +35,7 @@ fn generate(design: &JoyconDesign, rotation: i32) -> Handle {
     Handle::from_memory(svg_code.as_bytes().to_vec())
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Svg {
     map: RefCell<HashMap<(JoyconDesign, i32), Handle>>,
 }
