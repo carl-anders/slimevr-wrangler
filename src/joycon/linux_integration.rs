@@ -1,12 +1,11 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     sync::{mpsc, Arc},
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 use tokio::{sync::Mutex, time::interval};
 
 use evdev::{enumerate, EventStream, InputEventKind, Key};
-use tokio_stream::StreamExt;
 use upower_dbus::{DeviceProxy, UPowerProxy};
 
 use crate::settings;
@@ -131,28 +130,24 @@ async fn imu_listener(
     }
 }
 
-async fn battery_listener(tx: mpsc::Sender<ChannelData>, path: zbus::zvariant::OwnedObjectPath) {
+async fn check_batteries(tx: mpsc::Sender<ChannelData>, macs: &HashSet<String>) {
     let connection = zbus::Connection::system().await.unwrap();
-    let device = DeviceProxy::new(&connection, path).await.unwrap();
-    let mac = device.serial().await.unwrap();
-    let level = convert_battery(device.battery_level().await.unwrap());
+    let upower = UPowerProxy::new(&connection).await.unwrap();
 
-    tx.send(ChannelData {
-        serial_number: mac.clone(),
-        info: ChannelInfo::Battery(level),
-    })
-    .unwrap();
+    for upower_dev in upower.enumerate_devices().await.unwrap() {
+        let device = DeviceProxy::new(&connection, upower_dev.clone())
+            .await
+            .unwrap();
+        let Ok(serial) = device.serial().await else { continue; };
 
-    let mut stream = device.receive_battery_level_changed().await;
-
-    while let Some(battery) = stream.next().await {
-        let level = convert_battery(battery.get().await.unwrap());
-
-        tx.send(ChannelData {
-            serial_number: mac.clone(),
-            info: ChannelInfo::Battery(level),
-        })
-        .unwrap();
+        if macs.contains(&serial) {
+            let level = convert_battery(device.battery_level().await.unwrap());
+            tx.send(ChannelData {
+                serial_number: serial,
+                info: ChannelInfo::Battery(level),
+            })
+            .unwrap();
+        }
     }
 }
 
@@ -169,9 +164,8 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
 
     let mut slow_stream = interval(Duration::from_secs(2));
     let paths = Arc::new(Mutex::new(HashSet::new()));
-    let mut battery_macs = HashMap::new();
-    let connection = zbus::Connection::system().await.unwrap();
-    let upower = UPowerProxy::new(&connection).await.unwrap();
+    let mut battery_macs = HashSet::new();
+    let mut battery_check = Instant::now();
 
     loop {
         // Wait 2 seconds for enumerating
@@ -233,24 +227,14 @@ pub async fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Han
                     paths.lock().await.remove(&path);
                 });
 
-                // Add to battery_macs if not already there
-                battery_macs.entry(mac).or_insert(true);
+                // Add to list of batteries to check and check directly
+                battery_macs.insert(mac);
+                battery_check = Instant::now();
             }
         }
-        if battery_macs.iter().any(|(_, v)| *v) {
-            // There are joycon batteries we aren't listening to. Look for them in UPower
-            for upower_dev in upower.enumerate_devices().await.unwrap() {
-                let proxy = DeviceProxy::new(&connection, upower_dev.clone())
-                    .await
-                    .unwrap();
-                let Ok(serial) = proxy.serial().await else { continue; };
-
-                if *battery_macs.get(&serial).unwrap_or(&false) {
-                    *battery_macs.get_mut(&serial).unwrap() = false;
-                    tokio::spawn(battery_listener(tx.clone(), upower_dev));
-                    break;
-                }
-            }
+        if battery_check <= Instant::now() {
+            battery_check += Duration::from_secs(60 * 5);
+            check_batteries(tx.clone(), &battery_macs).await;
         }
     }
 }
