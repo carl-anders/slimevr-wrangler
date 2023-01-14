@@ -9,11 +9,13 @@ use std::{
 
 static LEFT: &str = include_str!("../../assets/joycon-left.svg");
 static RIGHT: &str = include_str!("../../assets/joycon-right.svg");
+static PRO: &str = include_str!("../../assets/pro-controller.svg");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum JoyconDesignType {
     Left,
     Right,
+    Pro,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -26,6 +28,7 @@ fn generate(design: &JoyconDesign, rotation: i32) -> Handle {
     let svg_code = match design.design_type {
         JoyconDesignType::Left => LEFT,
         JoyconDesignType::Right => RIGHT,
+        JoyconDesignType::Pro => PRO,
     }
     .replace("#3fa9f5", &design.color)
     .replace("rotate(0", &format!("rotate({:}", (rotation + 90) % 360));

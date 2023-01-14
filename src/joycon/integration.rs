@@ -41,8 +41,9 @@ fn convert_battery(battery: BatteryLevel) -> Battery {
 
 fn convert_design(device_type: &JoyConDeviceType) -> JoyconDesignType {
     match device_type {
-        JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => JoyconDesignType::Left,
+        JoyConDeviceType::JoyConL => JoyconDesignType::Left,
         JoyConDeviceType::JoyConR => JoyconDesignType::Right,
+        JoyConDeviceType::ProCon => JoyconDesignType::Pro,
     }
 }
 

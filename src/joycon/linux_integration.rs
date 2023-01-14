@@ -37,8 +37,9 @@ const USB_DEVICE_ID_NINTENDO_CHRGGRIP: u16 = 0x200E;
 
 fn convert_design(product_code: u16) -> JoyconDesignType {
     match product_code {
-        USB_DEVICE_ID_NINTENDO_JOYCONL | USB_DEVICE_ID_NINTENDO_PROCON => JoyconDesignType::Left,
+        USB_DEVICE_ID_NINTENDO_JOYCONL => JoyconDesignType::Left,
         USB_DEVICE_ID_NINTENDO_JOYCONR | USB_DEVICE_ID_NINTENDO_CHRGGRIP => JoyconDesignType::Right,
+        USB_DEVICE_ID_NINTENDO_PROCON => JoyconDesignType::Pro,
         _ => unreachable!(),
     }
 }
