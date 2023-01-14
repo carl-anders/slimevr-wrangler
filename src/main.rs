@@ -6,13 +6,13 @@ use iced::{
     time,
     widget::{
         button, canvas, checkbox, container, horizontal_space, scrollable, slider, text,
-        text_input, Column, Container, Row, Svg,
+        text_input, Column, Container, Row, Scrollable, Svg,
     },
     window, Alignment, Application, Color, Command, Element, Font, Length, Settings, Subscription,
 };
 
 use circle::circle;
-use itertools::Itertools;
+use iced_aw::Grid;
 use joycon::{Battery, DeviceStatus, ServerStatus};
 use needle::Needle;
 use settings::WranglerSettings;
@@ -70,7 +70,6 @@ pub fn main() -> iced::Result {
 
 #[derive(Debug, Clone)]
 enum Message {
-    EventOccurred(iced_native::Event),
     SettingsPressed,
     Tick(Instant),
     Dot(Instant),
@@ -88,7 +87,6 @@ enum Message {
 struct MainState {
     joycon: Option<joycon::Wrapper>,
     joycon_boxes: JoyconBoxes,
-    num_columns: usize,
     search_dots: usize,
     settings_show: bool,
     server_connected: ServerStatus,
@@ -105,10 +103,7 @@ impl Application for MainState {
     type Theme = Theme;
 
     fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
-        let mut new = Self {
-            num_columns: 3,
-            ..Self::default()
-        };
+        let mut new = Self::default();
         new.joycon = Some(joycon::Wrapper::new(new.settings.clone()));
         new.server_address = format!("{}", new.settings.load().get_socket_address());
         (
@@ -121,7 +116,7 @@ impl Application for MainState {
     }
 
     fn title(&self) -> String {
-        String::from("SlimeVR Wrangler")
+        "SlimeVR Wrangler".into()
     }
     fn theme(&self) -> Theme {
         Theme::Dark
@@ -132,14 +127,6 @@ impl Application for MainState {
             Message::SettingsPressed => {
                 self.settings_show = !self.settings_show;
             }
-            Message::EventOccurred(iced_native::Event::Window(
-                iced_native::window::Event::Resized { width, .. },
-            )) => {
-                if width >= WINDOW_SIZE.0 {
-                    self.num_columns = ((width - 20) / (300 + 20)) as usize;
-                }
-            }
-            Message::EventOccurred(_) => {}
             Message::Tick(_time) => {
                 if let Some(ref ji) = self.joycon {
                     if let Some(res) = ji.poll_status() {
@@ -188,74 +175,72 @@ impl Application for MainState {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let mut subs: Vec<Subscription<Message>> = vec![
-            iced_native::subscription::events().map(Message::EventOccurred),
+        Subscription::batch(vec![
             time::every(Duration::from_millis(500)).map(Message::Dot),
-        ];
-        if self.joycon.is_some() {
-            subs.push(time::every(Duration::from_millis(50)).map(Message::Tick));
-        }
-        Subscription::batch(subs)
+            time::every(Duration::from_millis(50)).map(Message::Tick),
+        ])
     }
 
     fn view(&self) -> Element<Message> {
-        let search_dots = ".".repeat(self.search_dots);
-        let main_container =
-        if self.settings_show {
-            let all_settings = Column::new()
-                .spacing(20)
-                .push(address(&self.settings.load().address))
-                .push(text(
-                    "You need to restart this program after changing this.",
-                ))
-                .push(checkbox(
-                    "Send yaw reset command to SlimeVR Server after B or UP button press.",
-                    self.settings.load().send_reset,
-                    Message::SettingsResetToggled,
-                ));
-            container(all_settings).padding(20)
-        } else {
-            let boxes = self.joycon_boxes.view(&self.settings.load());
-            let list = float_list(self.num_columns, boxes).push(
-                    text(format!(
-                        "Searching for Joycon controllers{search_dots}\n\
-                        Please pair controllers in the bluetooth settings of Windows if they don't show up here.",
-                    ))
-                );
+        let mut app = Column::new().push(top_bar(self.update_found.clone()));
 
-            let scrollable = scrollable(list).height(Length::Fill);
-
-            container(scrollable)
-        }
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .style(style::container_darker as for<'r> fn(&'r _) -> _);
-
-        let top_bar = top_bar(self.update_found.clone());
-
-        let mut app = Column::new().push(top_bar);
         if self.blacklist_info.visible() {
             app = app.push(blacklist_bar(&self.blacklist_info));
         }
 
-        let bottom_bar = bottom_bar(self.server_connected, &search_dots, &self.server_address);
-
-        app.push(main_container).push(bottom_bar).into()
+        app.push(
+            if self.settings_show {
+                container(self.settings_screen()).padding(20)
+            } else {
+                container(self.joycon_screen())
+            }
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(style::container_darker as for<'r> fn(&'r _) -> _),
+        )
+        .push(bottom_bar(
+            self.server_connected,
+            &".".repeat(self.search_dots),
+            &self.server_address,
+        ))
+        .into()
     }
 }
 
-fn float_list(columns: usize, boxes: Vec<Container<'_, Message>>) -> Column<'_, Message> {
-    let mut list = Column::new().padding(20).spacing(20).width(Length::Fill);
-    for chunk in &boxes.into_iter().chunks(columns) {
-        let mut row: Row<Message> = Row::new().spacing(20);
-
-        for bax in chunk {
-            row = row.push(bax);
+impl MainState {
+    fn joycon_screen(&self) -> Scrollable<'_, Message> {
+        let mut grid = Grid::with_column_width(320);
+        for bax in self.joycon_boxes.view(&self.settings.load()) {
+            grid.insert(container(bax).padding(10));
         }
-        list = list.push(row);
+        let list = Column::new().padding(10).width(Length::Fill).push(grid);
+
+        let list = list.push(
+            container(text(format!(
+                "Searching for Joycon controllers{}\n\
+                    Please pair controllers in the bluetooth \
+                    settings of Windows if they don't show up here.",
+                ".".repeat(self.search_dots)
+            )))
+            .padding(10),
+        );
+        scrollable(list).height(Length::Fill)
     }
-    list
+    fn settings_screen(&self) -> Column<'_, Message> {
+        Column::new()
+            .spacing(20)
+            .push(address(&self.settings.load().address))
+            .push(text(
+                "You need to restart this program after changing this.",
+            ))
+            .push(checkbox(
+                "Send yaw reset command to SlimeVR Server after B or UP button press.",
+                self.settings.load().send_reset,
+                Message::SettingsResetToggled,
+            ))
+    }
 }
+
 fn address<'a>(input_value: &str) -> Column<'a, Message> {
     let address_info = text("Enter a valid ip with port number:");
     let address = text_input("127.0.0.1:6969", input_value, Message::AddressChange)

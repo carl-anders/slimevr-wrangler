@@ -1715,6 +1715,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "iced_aw"
+version = "0.3.0"
+source = "git+https://github.com/iced-rs/iced_aw?rev=193e3bd8e6de4d8ce14ac2f2767323574b8fc712#193e3bd8e6de4d8ce14ac2f2767323574b8fc712"
+dependencies = [
+ "iced_graphics",
+ "iced_native",
+ "iced_style",
+]
+
+[[package]]
 name = "iced_core"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3527,6 +3537,7 @@ dependencies = [
  "directories",
  "evdev",
  "iced",
+ "iced_aw",
  "iced_native",
  "itertools 0.10.5",
  "joycon-rs",
