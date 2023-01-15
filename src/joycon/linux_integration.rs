@@ -132,7 +132,9 @@ async fn imu_listener(
 }
 
 async fn check_batteries(tx: mpsc::Sender<ChannelData>, macs: &HashSet<String>) {
-    let connection = zbus::Connection::system().await.unwrap();
+    let Ok(connection) = zbus::Connection::system().await else {
+        return;
+    };
     let upower = UPowerProxy::new(&connection).await.unwrap();
 
     for upower_dev in upower.enumerate_devices().await.unwrap() {
