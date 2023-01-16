@@ -174,6 +174,6 @@ pub fn spawn_thread(tx: mpsc::Sender<ChannelData>, settings: settings::Handler) 
     for d in devices.iter() {
         let tx = tx.clone();
         let settings = settings.clone();
-        std::thread::spawn(move || joycon_thread(d, tx, settings));
+        thread::spawn(move || joycon_thread(d, tx, settings));
     }
 }

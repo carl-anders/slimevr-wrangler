@@ -55,6 +55,6 @@ pub fn test_controllers(tx: mpsc::Sender<ChannelData>) {
     ];
     for c in controllers {
         let tx_clone = tx.clone();
-        std::thread::spawn(move || spawn_test(tx_clone, c.0.into(), c.1.into(), c.2));
+        thread::spawn(move || spawn_test(tx_clone, c.0.into(), c.1.into(), c.2));
     }
 }
