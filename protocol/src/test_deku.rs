@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use deku::{DekuContainerRead, DekuContainerWrite};
-    use nalgebra031::{Quaternion, UnitQuaternion};
+    use nalgebra032::{Quaternion, UnitQuaternion};
 
     use crate::PacketType;
 
