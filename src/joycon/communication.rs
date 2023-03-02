@@ -309,7 +309,7 @@ impl Communication {
     }
 
     fn update_statuses(&mut self) {
-        let discard_before = Instant::now() - Duration::from_secs(1);
+        let discard_before = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
         for device in self.devices.values_mut() {
             device.imu_times.retain(|t| t > &discard_before);
             match device.imu_times.len() {

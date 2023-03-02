@@ -20,22 +20,22 @@ iced_aw = { git = "https://github.com/iced-rs/iced_aw", rev = "120087c0bbeee4e00
 tokio = { version = "1.24.1", features = ["full"] }
 joycon-rs = { git = "https://github.com/carl-anders/joycon-rs" }
 directories = "4.0"
-self_update = { version = "0.32", features = [
+self_update = { version = "0.36", features = [
 	"archive-zip",
 	"compression-zip-deflate",
 ] }
 protocol = { path = "protocol", features = ["nalgebra032"] }
 itertools = "0.10"
-nalgebra = "0.32"
+nalgebra = { version = "0.32", features = ["convert-mint"] }
 arc-swap = "1.5"
-vqf-cxx = { git = "https://github.com/carl-anders/vqf-cxx", branch = "nalgebra-0.32" }
+vqf-cxx = { git = "https://github.com/kitlith/vqf-cxx", rev = "d1b94272cd2f73ea2baede3b785d3818f7411fc2" }
 keyvalues-parser = "0.1.0"
 regex = "1.6"
 thiserror = "1.0"
 spin_sleep = "1.1"
 
 [target.'cfg(target_os="windows")'.dependencies]
-winreg = "0.10"
+winreg = "0.11"
 
 [target.'cfg(target_os="windows")'.build-dependencies]
 winres = "0.1"

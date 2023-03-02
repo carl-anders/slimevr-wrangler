@@ -17,7 +17,6 @@ pub struct Imu {
 }
 impl Imu {
     pub fn new() -> Self {
-        // TODO: Lägg till uppdatering med intern kalibrering
         Self {
             vqf: VQFBuilder::new(0.005f64).build(),
             rotation: UnitQuaternion::new_unchecked(Quaternion::new(
@@ -29,7 +28,7 @@ impl Imu {
         let gyro = Vector3::new(frame.gyro_x, frame.gyro_y, frame.gyro_z);
         let acc = Vector3::new(frame.accel_x, frame.accel_y, frame.accel_z);
         self.vqf.update_6dof(&gyro.data.0[0], &acc.data.0[0]);
-        self.rotation = self.vqf.get_quat_6d();
+        self.rotation = UnitQuaternion::new_unchecked(self.vqf.get_quat_6d().into());
     }
     // euler_angles: roll, pitch, yaw
     pub fn euler_angles_deg(&self) -> (f64, f64, f64) {
