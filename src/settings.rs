@@ -4,6 +4,7 @@ use std::{
 
 use arc_swap::{ArcSwap, Guard};
 use directories::ProjectDirs;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 fn file_name() -> Option<PathBuf> {
@@ -31,10 +32,17 @@ pub struct WranglerSettings {
     pub joycon: HashMap<String, Joycon>,
     #[serde(default = "return_true")]
     pub send_reset: bool,
+    #[serde(default = "return_mac")]
+    pub emulated_mac: [u8; 6],
 }
 
 fn return_true() -> bool {
     true
+}
+
+fn return_mac() -> [u8; 6] {
+    let mut r = rand::thread_rng();
+    [0x00, 0x0F, r.gen(), r.gen(), r.gen(), r.gen()]
 }
 
 const DEFAULT_ADDR: &str = "127.0.0.1:6969";
@@ -49,15 +57,18 @@ impl WranglerSettings {
             .ok()
             .and_then(|file| serde_json::to_writer(file, self).ok());
     }
-    pub fn load() -> Self {
-        file_name()
+    pub fn load_and_save() -> Self {
+        let settings = file_name()
             .and_then(|path| File::open(path).ok())
             .and_then(|file| serde_json::from_reader(BufReader::new(file)).ok())
             .unwrap_or_else(|| Self {
                 address: DEFAULT_ADDR.into(),
                 joycon: HashMap::new(),
                 send_reset: true,
-            })
+                emulated_mac: return_mac(),
+            });
+        settings.save();
+        settings
     }
     pub fn joycon_rotation_add(&mut self, serial_number: String, degrees: i32) {
         let entry = self.joycon.entry(serial_number).or_default();
@@ -83,7 +94,7 @@ impl WranglerSettings {
 }
 impl Default for WranglerSettings {
     fn default() -> Self {
-        WranglerSettings::load()
+        WranglerSettings::load_and_save()
     }
 }
 

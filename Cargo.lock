@@ -3640,6 +3640,7 @@ dependencies = [
  "keyvalues-parser",
  "nalgebra 0.32.1",
  "protocol",
+ "rand",
  "regex",
  "self_update",
  "serde",

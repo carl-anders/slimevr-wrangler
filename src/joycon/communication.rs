@@ -205,7 +205,7 @@ impl Communication {
             imu_info: (0, 0, 0),
             build: 9,
             firmware: "slimevr-wrangler".to_string().into(),
-            mac_address: [0x00, 0x0F, 0x00, 0x0F, 0x00, 0x0F],
+            mac_address: self.settings.load().emulated_mac,
         };
         self.socket
             .send_to(&handshake.to_bytes().unwrap(), self.address)
@@ -272,12 +272,6 @@ impl Communication {
                         .unwrap();
 
                     let acc = calc_acceleration(device.imu.rotation, &imu_data[2], rad_rotation);
-                    /* if std::env::args().any(|a| &a == "debug") {
-                        if acc.x.abs() > 3.0 || acc.y.abs() > 3.0 || acc.z.abs() > 3.0 {
-                            println!("x: {:.3}, y: {:.3}, z: {:.3}", acc.x, acc.y, acc.z);
-                        }
-                    } */
-
                     let acceleration_packet = PacketType::Acceleration {
                         packet_id: 0,
                         vector: (acc.x as f32, acc.y as f32, acc.z as f32),
