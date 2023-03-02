@@ -209,7 +209,7 @@ impl Application for MainState {
 
 impl MainState {
     fn joycon_screen(&self) -> Scrollable<'_, Message> {
-        let mut grid = Grid::with_column_width(320);
+        let mut grid = Grid::with_column_width(320.0);
         for bax in self.joycon_boxes.view(&self.settings.load()) {
             grid.insert(container(bax).padding(10));
         }
@@ -244,7 +244,7 @@ impl MainState {
 fn address<'a>(input_value: &str) -> Column<'a, Message> {
     let address_info = text("Enter a valid ip with port number:");
     let address = text_input("127.0.0.1:6969", input_value, Message::AddressChange)
-        .width(Length::Units(500))
+        .width(Length::Fixed(500.0))
         .padding(10);
 
     let mut allc = Column::new().spacing(10).push(address_info).push(address);
@@ -269,7 +269,7 @@ fn top_bar<'a>(update: Option<String>) -> Container<'a, Message> {
             .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
             .on_press(Message::UpdatePressed);
         top_column = top_column
-            .push(horizontal_space(Length::Units(20)))
+            .push(horizontal_space(Length::Fixed(20.0)))
             .push(text(format!("New update found! Version: {u}. ")))
             .push(update_btn);
     }
@@ -291,7 +291,7 @@ fn blacklist_bar<'a>(result: &blacklist::BlacklistResult) -> Container<'a, Messa
     let mut row = Row::new()
         .align_items(Alignment::Center)
         .push(text(result.info.clone()))
-        .push(horizontal_space(Length::Units(20)));
+        .push(horizontal_space(Length::Fixed(20.0)));
     if result.fix_button {
         row = row.push(
             button(text("Fix blacklist"))
@@ -359,8 +359,8 @@ impl JoyconBoxes {
                     settings.joycon_scale_get(&status.serial_number),
                     settings.joycon_rotation_get(&status.serial_number),
                 ))
-                .height(Length::Units(335))
-                .width(Length::Units(300))
+                .height(Length::Fixed(335.0))
+                .width(Length::Fixed(300.0))
                 .padding(10)
                 .style(style::item_normal as for<'r> fn(&'r _) -> _)
             })
@@ -397,7 +397,7 @@ fn single_box_view<'a>(
         .align_items(Alignment::Center)
         .push(buttons)
         .push(svg)
-        .width(Length::Units(130));
+        .width(Length::Fixed(130.0));
 
     let rot = status.rotation;
     let values = Row::with_children(
@@ -411,8 +411,8 @@ fn single_box_view<'a>(
                     .push(text(name))
                     .push(
                         canvas(needle)
-                            .width(Length::Units(25))
-                            .height(Length::Units(25)),
+                            .width(Length::Fixed(25.0))
+                            .height(Length::Fixed(25.0)),
                     )
                     .push(text(format!("{ival}")))
                     .spacing(10)
@@ -437,7 +437,7 @@ fn single_box_view<'a>(
         .push(circle)
         .push(left)
         .push(values)
-        .height(Length::Units(150));
+        .height(Length::Fixed(150.0));
 
     let battery_text =
         container(text(format!("{:?}", status.battery))).style(match status.battery {
