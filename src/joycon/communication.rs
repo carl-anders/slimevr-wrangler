@@ -57,7 +57,7 @@ impl Display for DeviceStatus {
 struct Device {
     imu: Imu,
     design: JoyconDesign,
-    id: u8,
+    send_id: u8,
     battery: Battery,
     status: DeviceStatus,
     imu_times: Vec<Instant>,
@@ -67,7 +67,7 @@ impl Device {
     pub fn handshake(&self, socket: &UdpSocket, address: &SocketAddr) {
         let sensor_info = PacketType::SensorInfo {
             packet_id: 0,
-            sensor_id: self.id,
+            sensor_id: self.send_id,
             sensor_status: 1,
             sensor_type: 0,
         };
@@ -99,13 +99,6 @@ pub enum ChannelInfo {
     Reset,
     Disconnected,
 }
-/*
-fn serial_number_to_mac(serial: &str) -> [u8; 6] {
-    let mut hasher = Md5::new();
-    hasher.update(serial);
-    hasher.finalize()[0..6].try_into().unwrap()
-}
-*/
 
 #[derive(Debug, Copy, Clone)]
 struct Xyz {
@@ -156,6 +149,7 @@ pub struct Communication {
 
     devices: HashMap<String, Device>,
 
+    use_keep_ids: bool,
     socket: UdpSocket,
     address: SocketAddr,
     connected: ServerStatus,
@@ -177,6 +171,7 @@ impl Communication {
         let socket = UdpSocket::bind(&addrs[..]).unwrap();
         socket.set_nonblocking(true).ok();
         let address = { settings.load().get_socket_address() };
+        let use_keep_ids = { settings.load().keep_ids };
 
         server_tx.send(ServerStatus::Disconnected).ok();
 
@@ -186,6 +181,7 @@ impl Communication {
             server_tx,
             settings,
             devices: HashMap::new(),
+            use_keep_ids,
             socket,
             address,
             connected: ServerStatus::Disconnected,
@@ -232,15 +228,21 @@ impl Communication {
                     device.imu_times = vec![];
                     return;
                 }
-                let id = self.devices.len() as _;
+
+                let send_id = if self.use_keep_ids {
+                    self.settings.joycon_keep_id(sn.clone())
+                } else {
+                    self.devices.len() as _
+                };
                 let device = Device {
-                    design,
                     imu: Imu::new(),
-                    id,
+                    design,
+                    send_id,
                     battery: Battery::Full,
                     status: DeviceStatus::NoIMU,
                     imu_times: vec![],
                 };
+
                 device.handshake(&self.socket, &self.address);
                 self.devices.insert(sn, device);
             }
@@ -262,7 +264,7 @@ impl Communication {
 
                     let rotation_packet = PacketType::RotationData {
                         packet_id: 0,
-                        sensor_id: device.id,
+                        sensor_id: device.send_id,
                         data_type: 1,
                         quat: (*rotated_quat).into(),
                         calibration_info: 0,
@@ -275,7 +277,7 @@ impl Communication {
                     let acceleration_packet = PacketType::Acceleration {
                         packet_id: 0,
                         vector: (acc.x as f32, acc.y as f32, acc.z as f32),
-                        sensor_id: Some(device.id),
+                        sensor_id: Some(device.send_id),
                     };
                     self.socket
                         .send_to(&acceleration_packet.to_bytes().unwrap(), self.address)
@@ -339,7 +341,7 @@ impl Communication {
             {
                 self.last_handshake = Instant::now();
                 self.send_handshake();
-                for device in self.devices.values().sorted_by_key(|d| d.id) {
+                for device in self.devices.values().sorted_by_key(|d| d.send_id) {
                     device.handshake(&self.socket, &self.address);
                 }
             }

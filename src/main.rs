@@ -81,6 +81,7 @@ enum Message {
     JoyconRotate(String, bool),
     JoyconScale(String, f64),
     SettingsResetToggled(bool),
+    SettingsIdsToggled(bool),
 }
 
 #[derive(Default)]
@@ -170,6 +171,9 @@ impl Application for MainState {
             Message::SettingsResetToggled(new) => {
                 self.settings.change(|ws| ws.send_reset = new);
             }
+            Message::SettingsIdsToggled(new) => {
+                self.settings.change(|ws| ws.keep_ids = new);
+            }
         }
         Command::none()
     }
@@ -237,6 +241,11 @@ impl MainState {
                 "Send yaw reset command to SlimeVR Server after B or UP button press.",
                 self.settings.load().send_reset,
                 Message::SettingsResetToggled,
+            ))
+            .push(checkbox(
+                "Save mounting location on server. Requires SlimeVR Server v0.6.1 or newer. (Restart wrangler after changing this)",
+                self.settings.load().keep_ids,
+                Message::SettingsIdsToggled,
             ))
     }
 }

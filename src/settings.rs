@@ -10,10 +10,17 @@ use serde::{Deserialize, Serialize};
 fn file_name() -> Option<PathBuf> {
     ProjectDirs::from("", "", "SlimeVR Wrangler").map(|pd| pd.config_dir().join("config.json"))
 }
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Joycon {
+    #[serde(default)]
     pub rotation: i32,
+    #[serde(default = "return_f64_one")]
     pub gyro_scale_factor: f64,
+    #[serde(default)]
+    pub keep_id: u8,
+}
+fn return_f64_one() -> f64 {
+    1.0
 }
 
 impl Default for Joycon {
@@ -21,6 +28,7 @@ impl Default for Joycon {
         Joycon {
             rotation: 0,
             gyro_scale_factor: 1.0,
+            keep_id: 0,
         }
     }
 }
@@ -34,12 +42,16 @@ pub struct WranglerSettings {
     pub send_reset: bool,
     #[serde(default = "return_mac")]
     pub emulated_mac: [u8; 6],
+    #[serde(default = "return_false")]
+    pub keep_ids: bool,
 }
 
 fn return_true() -> bool {
     true
 }
-
+fn return_false() -> bool {
+    false
+}
 fn return_mac() -> [u8; 6] {
     let mut r = rand::thread_rng();
     [0x00, 0x0F, r.gen(), r.gen(), r.gen(), r.gen()]
@@ -55,7 +67,7 @@ impl WranglerSettings {
         }
         File::create(file)
             .ok()
-            .and_then(|file| serde_json::to_writer(file, self).ok());
+            .and_then(|file| serde_json::to_writer_pretty(file, self).ok());
     }
     pub fn load_and_save() -> Self {
         let settings = file_name()
@@ -66,6 +78,7 @@ impl WranglerSettings {
                 joycon: HashMap::new(),
                 send_reset: true,
                 emulated_mac: return_mac(),
+                keep_ids: false,
             });
         settings.save();
         settings
@@ -85,6 +98,15 @@ impl WranglerSettings {
         self.joycon
             .get(serial_number)
             .map_or(1.0, |j| j.gyro_scale_factor)
+    }
+    fn joycon_keep_id_set_new(&mut self, serial_number: String) {
+        let max = self.joycon.values().map(|j| j.keep_id).max();
+        let entry = self.joycon.entry(serial_number).or_default();
+        entry.keep_id = max.unwrap_or_default().saturating_add(1);
+        if entry.keep_id == u8::MAX {
+            println!("\x1b[0;31m[ERROR]\x1b[0m TOO MANY JOYCONS SAVED! THIS WILL BREAK THINGS!");
+            println!(" YOU NEED TO DISABLE THE \"Save mounting location on server\" SETTING!!!");
+        }
     }
     pub fn get_socket_address(&self) -> SocketAddr {
         self.address
@@ -114,5 +136,20 @@ impl Handler {
         func(&mut current);
         current.save();
         self.arc.store(Arc::new(current));
+    }
+    pub fn joycon_keep_id(&self, serial_number: String) -> u8 {
+        let keep_id = self
+            .load()
+            .joycon
+            .get(&serial_number)
+            .map_or(0, |j| j.keep_id);
+        if keep_id != 0 {
+            return keep_id;
+        }
+        self.change(|ws| ws.joycon_keep_id_set_new(serial_number.clone()));
+        self.load()
+            .joycon
+            .get(&serial_number)
+            .map_or(0, |j| j.keep_id)
     }
 }
