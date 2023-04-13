@@ -50,7 +50,7 @@ pub fn main() -> iced::Result {
         window: window::Settings {
             min_size: Some(WINDOW_SIZE),
             size: WINDOW_SIZE,
-            icon: window::Icon::from_rgba(ICON.to_vec(), 64, 64).ok(),
+            icon: window::icon::from_rgba(ICON.to_vec(), 64, 64).ok(),
             ..window::Settings::default()
         },
         antialiasing: true,
@@ -248,7 +248,8 @@ impl MainState {
 }
 
 fn address<'a>(input_value: &str) -> Column<'a, Message> {
-    let address = text_input("127.0.0.1:6969", input_value, Message::AddressChange)
+    let address = text_input("127.0.0.1:6969", input_value)
+        .on_input(Message::AddressChange)
         .width(Length::Fixed(300.0))
         .padding(10);
 
@@ -353,7 +354,7 @@ impl Default for JoyconBoxes {
         Self {
             statuses: vec![],
             svg_handler: joycon::Svg::new(),
-            needles: (0..360).into_iter().map(Needle::new).collect(),
+            needles: (0..360).map(Needle::new).collect(),
         }
     }
 }
