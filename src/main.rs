@@ -234,16 +234,13 @@ impl MainState {
         Column::new()
             .spacing(20)
             .push(address(&self.settings.load().address))
-            .push(text(
-                "You need to restart this program after changing this.",
-            ))
             .push(checkbox(
                 "Send yaw reset command to SlimeVR Server after B or UP button press.",
                 self.settings.load().send_reset,
                 Message::SettingsResetToggled,
             ))
             .push(checkbox(
-                "Save mounting location on server. Requires SlimeVR Server v0.6.1 or newer. (Restart wrangler after changing this)",
+                "Save mounting location on server. Requires SlimeVR Server v0.6.1 or newer. Restart Wrangler after changing this.",
                 self.settings.load().keep_ids,
                 Message::SettingsIdsToggled,
             ))
@@ -251,17 +248,22 @@ impl MainState {
 }
 
 fn address<'a>(input_value: &str) -> Column<'a, Message> {
-    let address_info = text("Enter a valid ip with port number:");
     let address = text_input("127.0.0.1:6969", input_value, Message::AddressChange)
-        .width(Length::Fixed(500.0))
+        .width(Length::Fixed(300.0))
         .padding(10);
 
-    let mut allc = Column::new().spacing(10).push(address_info).push(address);
+    let address_row = Row::new()
+        .spacing(10)
+        .align_items(Alignment::Center)
+        .push("SlimeVR Server address:")
+        .push(address)
+        .push("Restart Wrangler after changing this.");
+    let mut allc = Column::new().push(address_row).spacing(10);
 
     if input_value.parse::<SocketAddr>().is_err() {
         allc = allc.push(
             container(text(
-                "Input not a valid ip with port number! Using default instead (127.0.0.1:6969).",
+                "Address is not a valid ip with port number! Using default instead (127.0.0.1:6969).",
             ))
             .style(style::text_yellow as for<'r> fn(&'r _) -> _),
         );
