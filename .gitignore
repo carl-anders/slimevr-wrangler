@@ -1,1 +1,4 @@
 /target
+
+# direnv got claimed by the nix gang
+.direnv
