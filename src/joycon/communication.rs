@@ -286,7 +286,9 @@ impl Communication {
                 }
             }
             ChannelInfo::QuatData(imu_data) => {
-                if let Some(device) = self.devices.get(&sn) {
+                if let Some(device) = self.devices.get_mut(&sn) {
+                    device.imu.rotation = imu_data[0].quat;
+                    device.imu_times.push(Instant::now());
                     let joycon_rotation = self.settings.load().joycon_rotation_get(&sn);
                     let rad_rotation = (joycon_rotation as f64).to_radians();
                     let rotated_quat = if joycon_rotation > 0 {

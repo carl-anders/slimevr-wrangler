@@ -71,6 +71,7 @@ impl TryFrom<[u8; 349]> for IMUData {
             first.copy_from_slice(&latest.rotation_fragment);
             second.copy_from_slice(&a_5ms_older.rotation_fragment);
             third.copy_from_slice(&a_10ms_older.rotation_fragment);
+            //concat.chunks_exact_mut(2).for_each(|c| c.swap(0, 1));
             concat
         };
         let ([quat_latest, quat_5ms, quat_10ms], _ts) = joycon_quat::Quaternion::parse(rotation_data).unwrap(); // TODO: throw error
@@ -93,17 +94,19 @@ impl<D: JoyConDriver> InputReportMode<D> for QuatFullMode<D> {
     type Report = StandardInputReport<IMUData>;
     type ArgsType = [u8; 1];
     const SUB_COMMAND: SubCommand = SubCommand::SetInputReportMode;
-    const ARGS: Self::ArgsType = [0x02];
+    const ARGS: Self::ArgsType = [0x30];
 
     fn new(mut driver: D) -> JoyConResult<Self> {
         // enable IMU(6-Axis sensor)
-        let imf_enabled = driver
-            .enabled_features()
-            .iter()
-            .any(|jf| matches!(jf, JoyConFeature::IMUFeature(_)));
-        if !imf_enabled {
-            driver.enable_feature(JoyConFeature::IMUFeature(IMUConfig::default()))?;
-        }
+        // let imf_enabled = driver
+        //     .enabled_features()
+        //     .iter()
+        //     .any(|jf| matches!(jf, JoyConFeature::IMUFeature(_)));
+        // if !imf_enabled {
+        //     driver.enable_feature(JoyConFeature::IMUFeature(IMUConfig::default()))?;
+        // }
+
+        driver.send_sub_command(SubCommand::EnableIMU, &[0x02u8])?;
 
         driver.set_valid_reply(false);
 
