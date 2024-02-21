@@ -12,7 +12,7 @@ use protocol::deku::{DekuContainerRead, DekuContainerWrite};
 use protocol::PacketType;
 
 use super::{
-    imu::{Imu, JoyconAxisData},
+    imu::{Imu, JoyconAxisData, JoyconQuatData},
     JoyconDesign,
 };
 use crate::settings;
@@ -95,6 +95,7 @@ impl ChannelData {
 pub enum ChannelInfo {
     Connected(JoyconDesign),
     ImuData([JoyconAxisData; 3]),
+    QuatData([JoyconQuatData; 3]),
     Battery(Battery),
     Reset,
     Disconnected,
@@ -109,7 +110,7 @@ struct Xyz {
 
 fn calc_acceleration(
     rotation: UnitQuaternion<f64>,
-    axisdata: &JoyconAxisData,
+    axisdata: &[f64; 3],
     rad_rotation: f64,
 ) -> Xyz {
     let a = rotation.coords;
@@ -120,9 +121,9 @@ fn calc_acceleration(
         w * w - x * x - y * y + z * z,
     ];
     let vector = Xyz {
-        x: axisdata.accel_x - gravity[0],
-        y: axisdata.accel_y - gravity[1],
-        z: axisdata.accel_z - gravity[2],
+        x: axisdata[0] - gravity[0],
+        y: axisdata[1] - gravity[1],
+        z: axisdata[2] - gravity[2],
     };
 
     let rad_rotation = -rad_rotation;
@@ -273,7 +274,7 @@ impl Communication {
                         .send_to(&rotation_packet.to_bytes().unwrap(), self.address)
                         .unwrap();
 
-                    let acc = calc_acceleration(device.imu.rotation, &imu_data[2], rad_rotation);
+                    let acc = calc_acceleration(device.imu.rotation, &[imu_data[2].accel_x, imu_data[2].accel_y, imu_data[2].accel_z], rad_rotation);
                     let acceleration_packet = PacketType::Acceleration {
                         packet_id: 0,
                         vector: (acc.x as f32, acc.y as f32, acc.z as f32),
@@ -283,6 +284,40 @@ impl Communication {
                         .send_to(&acceleration_packet.to_bytes().unwrap(), self.address)
                         .unwrap();
                 }
+            }
+            ChannelInfo::QuatData(imu_data) => {
+                if let Some(device) = self.devices.get(&sn) {
+                    let joycon_rotation = self.settings.load().joycon_rotation_get(&sn);
+                    let rad_rotation = (joycon_rotation as f64).to_radians();
+                    let rotated_quat = if joycon_rotation > 0 {
+                        imu_data[0].quat
+                            * UnitQuaternion::from_axis_angle(&Vector3::z_axis(), rad_rotation)
+                    } else {
+                        imu_data[0].quat
+                    };
+
+                    let rotation_packet = PacketType::RotationData {
+                        packet_id: 0,
+                        sensor_id: device.send_id,
+                        data_type: 1,
+                        quat: (*rotated_quat).into(),
+                        calibration_info: 0,
+                    };
+                    self.socket
+                        .send_to(&rotation_packet.to_bytes().unwrap(), self.address)
+                        .unwrap();
+
+                    let acc = calc_acceleration(device.imu.rotation, &[imu_data[0].accel_x, imu_data[0].accel_y, imu_data[0].accel_z], rad_rotation);
+                    let acceleration_packet = PacketType::Acceleration {
+                        packet_id: 0,
+                        vector: (acc.x as f32, acc.y as f32, acc.z as f32),
+                        sensor_id: Some(device.send_id),
+                    };
+                    self.socket
+                        .send_to(&acceleration_packet.to_bytes().unwrap(), self.address)
+                        .unwrap();
+                }
+                
             }
             ChannelInfo::Battery(battery) => {
                 if let Some(device) = self.devices.get_mut(&sn) {
