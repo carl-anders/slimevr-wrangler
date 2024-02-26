@@ -11,6 +11,14 @@ pub struct JoyconAxisData {
     pub gyro_z: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct JoyconQuatData {
+    pub accel_x: f64,
+    pub accel_y: f64,
+    pub accel_z: f64,
+    pub quat: UnitQuaternion<f64>,
+}
+
 pub struct Imu {
     vqf: VQF,
     pub rotation: UnitQuaternion<f64>,
