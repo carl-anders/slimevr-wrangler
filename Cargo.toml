@@ -35,7 +35,7 @@ regex = "1.6"
 thiserror = "1.0"
 spin_sleep = "1.1"
 rand = "0.8"
-joycon-quat = { path = "../joycon-quat" }
+joycon-quat = { git = "https://github.com/kitlith/joycon-quat", rev = "011bcaf56eee725b94ea007596b8c01bd701facc" }
 static-slicing = "0.2.0"
 
 [target.'cfg(target_os="windows")'.dependencies]
