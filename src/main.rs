@@ -1,18 +1,16 @@
 #![deny(clippy::all)]
 
 use iced::{
-    executor,
-    theme::{self, Theme},
     time,
     widget::{
-        button, canvas, checkbox, container, horizontal_space, scrollable, slider, text,
-        text_input, Column, Container, Row, Scrollable, Svg,
+        button, checkbox, container, horizontal_space, scrollable, slider, text, text_input,
+        Column, Container, Row, Scrollable, Space, Svg,
     },
-    window, Alignment, Application, Color, Command, Element, Font, Length, Settings, Subscription,
+    window, Alignment, Color, Element, Font, Length, Size, Subscription, Task as Command,
 };
 
 use circle::circle;
-use iced_aw::Grid;
+use iced_aw::Wrap;
 use joycon::{Battery, DeviceStatus, ServerStatus};
 use needle::Needle;
 use settings::WranglerSettings;
@@ -33,12 +31,12 @@ mod settings;
 mod style;
 mod update;
 
-const WINDOW_SIZE: (u32, u32) = (980, 700);
-
-pub const ICONS: Font = Font::External {
-    name: "Icons",
-    bytes: include_bytes!("../assets/icons.ttf"),
+const WINDOW_SIZE: Size = Size {
+    width: 980.0,
+    height: 700.0,
 };
+
+pub const ICONS: &[u8] = include_bytes!("../assets/icons.ttf");
 pub const ICON: &[u8; 16384] = include_bytes!("../assets/icon_64.rgba8");
 
 pub fn main() -> iced::Result {
@@ -46,17 +44,19 @@ pub fn main() -> iced::Result {
     let rgba8 = image_rs::io::Reader::open("assets/icon.png").unwrap().decode().unwrap().to_rgba8();
     std::fs::write("assets/icon_64.rgba8", rgba8.into_raw());
     */
-    let settings = Settings {
-        window: window::Settings {
-            min_size: Some(WINDOW_SIZE),
-            size: WINDOW_SIZE,
-            icon: window::icon::from_rgba(ICON.to_vec(), 64, 64).ok(),
-            ..window::Settings::default()
-        },
-        antialiasing: true,
-        ..Settings::default()
+    let window_settings = window::Settings {
+        size: WINDOW_SIZE,
+        min_size: Some(WINDOW_SIZE),
+        icon: window::icon::from_rgba(ICON.to_vec(), 64, 64).ok(),
+        ..window::Settings::default()
     };
-    match MainState::run(settings) {
+    let run = iced::application("SlimeVR Wrangler", MainState::update, MainState::view)
+        .subscription(MainState::subscription)
+        .window(window_settings)
+        .antialiasing(true)
+        .font(ICONS)
+        .run_with(MainState::new);
+    match run {
         Ok(a) => Ok(a),
         Err(e) => {
             println!("{e:?}");
@@ -97,13 +97,8 @@ struct MainState {
     update_found: Option<String>,
     blacklist_info: blacklist::BlacklistResult,
 }
-impl Application for MainState {
-    type Executor = executor::Default;
-    type Flags = ();
-    type Message = Message;
-    type Theme = Theme;
-
-    fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
+impl MainState {
+    fn new() -> (Self, Command<Message>) {
         let mut new = Self::default();
         new.joycon = Some(joycon::Wrapper::new(new.settings.clone()));
         new.server_address = format!("{}", new.settings.load().get_socket_address());
@@ -116,14 +111,7 @@ impl Application for MainState {
         )
     }
 
-    fn title(&self) -> String {
-        "SlimeVR Wrangler".into()
-    }
-    fn theme(&self) -> Theme {
-        Theme::Dark
-    }
-
-    fn update(&mut self, message: Message) -> Command<Self::Message> {
+    fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::SettingsPressed => {
                 self.settings_show = !self.settings_show;
@@ -200,7 +188,7 @@ impl Application for MainState {
             }
             .width(Length::Fill)
             .height(Length::Fill)
-            .style(style::container_darker as for<'r> fn(&'r _) -> _),
+            .style(style::container_darker),
         )
         .push(bottom_bar(
             self.server_connected,
@@ -209,14 +197,11 @@ impl Application for MainState {
         ))
         .into()
     }
-}
-
-impl MainState {
     fn joycon_screen(&self) -> Scrollable<'_, Message> {
-        let mut grid = Grid::with_column_width(320.0);
-        for bax in self.joycon_boxes.view(&self.settings.load()) {
-            grid.insert(container(bax).padding(10));
-        }
+        let boxes = self.joycon_boxes.view(&self.settings.load());
+        let grid = boxes.into_iter().fold(Wrap::new(), |wrap, bax| {
+            wrap.push(container(bax).padding(10))
+        });
         let list = Column::new().padding(10).width(Length::Fill).push(grid);
 
         let list = list.push(
@@ -236,12 +221,12 @@ impl MainState {
             .push(address(&self.settings.load().address))
             .push(checkbox(
                 "Send yaw reset command to SlimeVR Server after B or UP button press.",
-                self.settings.load().send_reset,
-                Message::SettingsResetToggled,
-            ))
+                self.settings.load().send_reset).on_toggle(
+                Message::SettingsResetToggled)
+            )
             .push(checkbox(
                 "Save mounting location on server. Requires SlimeVR Server v0.6.1 or newer. Restart Wrangler after changing this.",
-                self.settings.load().keep_ids,
+                self.settings.load().keep_ids).on_toggle(
                 Message::SettingsIdsToggled,
             ))
     }
@@ -255,7 +240,7 @@ fn address<'a>(input_value: &str) -> Column<'a, Message> {
 
     let address_row = Row::new()
         .spacing(10)
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .push("SlimeVR Server address:")
         .push(address)
         .push("Restart Wrangler after changing this.");
@@ -266,55 +251,53 @@ fn address<'a>(input_value: &str) -> Column<'a, Message> {
             container(text(
                 "Address is not a valid ip with port number! Using default instead (127.0.0.1:6969).",
             ))
-            .style(style::text_yellow as for<'r> fn(&'r _) -> _),
+            .style(style::text_yellow),
         );
     }
     allc
 }
 fn top_bar<'a>(update: Option<String>) -> Container<'a, Message> {
     let mut top_column = Row::new()
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .push(text("SlimeVR Wrangler").size(24));
 
     if let Some(u) = update {
         let update_btn = button(text("Update"))
-            .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
+            .style(style::button_primary)
             .on_press(Message::UpdatePressed);
         top_column = top_column
-            .push(horizontal_space(Length::Fixed(20.0)))
+            .push(Space::with_width(Length::Fixed(20.0)))
             .push(text(format!("New update found! Version: {u}. ")))
             .push(update_btn);
     }
 
     let settings = button(text("Settings"))
-        .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
+        .style(style::button_settings)
         .on_press(Message::SettingsPressed);
-    top_column = top_column
-        .push(horizontal_space(Length::Fill))
-        .push(settings);
+    top_column = top_column.push(horizontal_space()).push(settings);
 
     container(top_column)
         .width(Length::Fill)
         .padding(20)
-        .style(style::container_highlight as for<'r> fn(&'r _) -> _)
+        .style(style::container_highlight)
 }
 
 fn blacklist_bar<'a>(result: &blacklist::BlacklistResult) -> Container<'a, Message> {
     let mut row = Row::new()
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .push(text(result.info.clone()))
-        .push(horizontal_space(Length::Fixed(20.0)));
+        .push(Space::with_width(Length::Fixed(20.0)));
     if result.fix_button {
         row = row.push(
             button(text("Fix blacklist"))
-                .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
+                .style(style::button_primary)
                 .on_press(Message::BlacklistFixPressed),
         );
     }
     container(row)
         .width(Length::Fill)
         .padding(20)
-        .style(style::container_info as for<'r> fn(&'r _) -> _)
+        .style(style::container_info)
 }
 
 fn bottom_bar<'a>(
@@ -339,14 +322,14 @@ fn bottom_bar<'a>(
     container(status)
         .width(Length::Fill)
         .padding(20)
-        .style(style::container_info as for<'r> fn(&'r _) -> _)
+        .style(style::container_info)
 }
 
 #[derive(Debug)]
 struct JoyconBoxes {
     pub statuses: Vec<joycon::Status>,
     svg_handler: joycon::Svg,
-    needles: Vec<Needle>,
+    needle_handler: Needle,
 }
 
 impl Default for JoyconBoxes {
@@ -354,7 +337,7 @@ impl Default for JoyconBoxes {
         Self {
             statuses: vec![],
             svg_handler: joycon::Svg::new(),
-            needles: (0..360).map(Needle::new).collect(),
+            needle_handler: Needle::new(),
         }
     }
 }
@@ -367,14 +350,14 @@ impl JoyconBoxes {
                 container(single_box_view(
                     status,
                     &self.svg_handler,
-                    &self.needles,
+                    &self.needle_handler,
                     settings.joycon_scale_get(&status.serial_number),
                     settings.joycon_rotation_get(&status.serial_number),
                 ))
                 .height(Length::Fixed(335.0))
                 .width(Length::Fixed(300.0))
                 .padding(10)
-                .style(style::item_normal as for<'r> fn(&'r _) -> _)
+                .style(style::item_normal)
             })
             .collect()
     }
@@ -383,7 +366,7 @@ impl JoyconBoxes {
 fn single_box_view<'a>(
     status: &joycon::Status,
     svg_handler: &joycon::Svg,
-    needles: &'a [Needle],
+    needle_handler: &Needle,
     scale: f64,
     mount_rot: i32,
 ) -> Column<'a, Message> {
@@ -392,21 +375,21 @@ fn single_box_view<'a>(
     let buttons = Row::new()
         .spacing(10)
         .push(
-            button(text("↺").font(ICONS))
+            button(text("↺").font(Font::with_name("fontello")))
                 .on_press(Message::JoyconRotate(sn.clone(), false))
-                .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
+                .style(style::button_primary),
         )
         .push(
-            button(text("↻").font(ICONS))
+            button(text("↻").font(Font::with_name("fontello")))
                 .on_press(Message::JoyconRotate(sn.clone(), true))
-                .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
+                .style(style::button_primary),
         );
 
     let svg = Svg::new(svg_handler.get(&status.design, mount_rot));
 
     let left = Column::new()
         .spacing(10)
-        .align_items(Alignment::Center)
+        .align_x(Alignment::Center)
         .push(buttons)
         .push(svg)
         .width(Length::Fixed(130.0));
@@ -416,23 +399,22 @@ fn single_box_view<'a>(
         [("Roll", rot.0), ("Pitch", rot.1), ("Yaw", -rot.2)]
             .iter()
             .map(|(name, val)| {
-                let ival = (*val as i32).rem_euclid(360) as usize;
-                let needle = needles.get(ival).unwrap_or_else(|| &needles[0]);
+                let ival = (*val as i32).rem_euclid(360);
 
                 Column::new()
-                    .push(text(name))
+                    .push(text(name.to_string()))
                     .push(
-                        canvas(needle)
+                        Svg::new(needle_handler.get(ival))
                             .width(Length::Fixed(25.0))
                             .height(Length::Fixed(25.0)),
                     )
                     .push(text(format!("{ival}")))
                     .spacing(10)
-                    .align_items(Alignment::Center)
+                    .align_x(Alignment::Center)
                     .width(Length::Fill)
                     .into()
             })
-            .collect(),
+            .collect::<Vec<_>>(),
     );
 
     let circle = circle(
@@ -443,10 +425,13 @@ fn single_box_view<'a>(
             DeviceStatus::Healthy => Color::from_rgb8(0x3d, 0xff, 0x81),
         },
     );
+    let circle_cont = container(circle)
+        .width(Length::Fixed(16.0))
+        .height(Length::Fixed(16.0));
 
     let top = Row::new()
         .spacing(5)
-        .push(circle)
+        .push(circle_cont)
         .push(left)
         .push(values)
         .height(Length::Fixed(150.0));
