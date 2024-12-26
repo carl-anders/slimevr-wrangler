@@ -2,32 +2,56 @@ use std::{env, sync::mpsc};
 
 use crate::settings;
 
-use super::{main_thread, spawn_thread, test_integration::test_controllers, JoyconStatus};
+#[cfg(target_os = "linux")]
+use super::linux_integration;
+use super::{
+    communication::ServerStatus, spawn_thread, test_integration::test_controllers, Communication,
+    Status,
+};
 
-fn startup(settings: settings::Handler) -> mpsc::Receiver<Vec<JoyconStatus>> {
-    let (out_tx, out_rx) = mpsc::channel();
-    let (tx, rx) = mpsc::channel();
-    let settings_clone = settings.clone();
-    let _drop = std::thread::spawn(move || main_thread(rx, out_tx, settings));
-
-    let tx_clone = tx.clone();
-    if env::args().any(|a| &a == "test") {
-        std::thread::spawn(move || test_controllers(tx_clone));
-    }
-    std::thread::spawn(move || spawn_thread(tx, settings_clone));
-    out_rx
+pub struct Wrapper {
+    status_rx: mpsc::Receiver<Vec<Status>>,
+    server_rx: mpsc::Receiver<ServerStatus>,
 }
-
-pub struct JoyconIntegration {
-    rx: mpsc::Receiver<Vec<JoyconStatus>>,
-}
-impl JoyconIntegration {
+impl Wrapper {
     pub fn new(settings: settings::Handler) -> Self {
+        let (status_tx, status_rx) = mpsc::channel();
+        let (server_tx, server_rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel();
+
+        {
+            let settings = settings.clone();
+            std::thread::spawn(move || {
+                Communication::start(rx, status_tx, server_tx, settings);
+            });
+        }
+
+        {
+            let tx = tx.clone();
+            if env::args().any(|a| &a == "test") {
+                std::thread::spawn(move || test_controllers(tx));
+            }
+        }
+
+        // evdev integration
+        #[cfg(target_os = "linux")]
+        {
+            let tx = tx.clone();
+            let settings = settings.clone();
+            std::thread::spawn(move || linux_integration::spawn_thread(tx, settings));
+        }
+
+        std::thread::spawn(move || spawn_thread(tx, settings));
+
         Self {
-            rx: startup(settings),
+            status_rx,
+            server_rx,
         }
     }
-    pub fn poll(&self) -> Option<Vec<JoyconStatus>> {
-        self.rx.try_iter().last()
+    pub fn poll_status(&self) -> Option<Vec<Status>> {
+        self.status_rx.try_iter().last()
+    }
+    pub fn poll_server(&self) -> Option<ServerStatus> {
+        self.server_rx.try_iter().last()
     }
 }

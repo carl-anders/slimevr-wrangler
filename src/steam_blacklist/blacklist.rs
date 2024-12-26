@@ -61,7 +61,7 @@ fn inner_check() -> BlacklistResult {
 }
 
 pub async fn check_blacklist() -> BlacklistResult {
-    async_std::task::spawn_blocking(inner_check).await
+    tokio::task::spawn_blocking(inner_check).await.unwrap()
 }
 fn inner_update() -> BlacklistResult {
     let mut list = match Blacklist::read() {
@@ -87,7 +87,7 @@ fn inner_update() -> BlacklistResult {
                     println!("[ERROR] Steam config - Could not save config file.");
                 },
                 BlacklistError::IO(e) => {
-                    println!("[ERROR] Could not read/write config file. Full Error:\n{:?}", e);
+                    println!("[ERROR] Could not read/write config file. Full Error:\n{e:?}");
                 },
             }
             BlacklistResult::info("Couldn't update steam controller blacklist. More info in console.")
@@ -96,9 +96,10 @@ fn inner_update() -> BlacklistResult {
 }
 
 pub async fn update_blacklist() -> BlacklistResult {
-    async_std::task::spawn_blocking(|| {
+    tokio::task::spawn_blocking(|| {
         thread::sleep(Duration::from_millis(500)); // Add delay so fixing message can be seen
         inner_update()
     })
     .await
+    .unwrap()
 }

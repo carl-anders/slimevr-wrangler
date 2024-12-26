@@ -14,7 +14,7 @@ fn update_config() -> Result<Box<dyn ReleaseUpdate>, Error> {
         .build()
 }
 pub async fn check_updates() -> Option<String> {
-    async_std::task::spawn_blocking(|| {
+    tokio::task::spawn_blocking(|| {
         if let Ok(conf) = update_config() {
             if let Ok(release) = conf.get_latest_release() {
                 match version::bump_is_greater(env!("CARGO_PKG_VERSION"), &release.version) {
@@ -28,6 +28,7 @@ pub async fn check_updates() -> Option<String> {
         None
     })
     .await
+    .unwrap()
 }
 pub fn update() {
     if let Ok(conf) = update_config() {
@@ -36,7 +37,7 @@ pub fn update() {
                 panic!("Update complete.");
             }
             Err(e) => {
-                println!("Update not successful.\n{}", e);
+                println!("Update not successful.\n{e}");
             }
         }
     }

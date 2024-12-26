@@ -1,53 +1,75 @@
 #![deny(clippy::all)]
 
 use iced::{
-    executor,
-    theme::{self, Theme},
     time,
     widget::{
-        button, container, horizontal_space, scrollable, slider, text, text_input, vertical_space,
-        Column, Container, Row, Scrollable, Svg,
+        button, checkbox, container, horizontal_space, scrollable, slider, text, text_input,
+        Column, Container, Row, Scrollable, Space, Svg,
     },
-    window, Alignment, Application, Command, Element, Font, Length, Settings, Subscription,
+    window, Alignment, Color, Element, Font, Length, Size, Subscription, Task as Command,
 };
-use itertools::Itertools;
+
+use circle::circle;
+use iced_aw::Wrap;
+use joycon::{Battery, DeviceStatus, ServerStatus};
+use needle::Needle;
+use settings::WranglerSettings;
 use std::{
+    io::{
+        self,
+        prelude::{Read, Write},
+    },
     net::SocketAddr,
     time::{Duration, Instant},
 };
 mod joycon;
 mod steam_blacklist;
-use crate::joycon::{JoyconIntegration, JoyconStatus, JoyconSvg};
 use steam_blacklist as blacklist;
+mod circle;
+mod needle;
 mod settings;
-mod slime;
 mod style;
 mod update;
 
-const WINDOW_SIZE: (u32, u32) = (980, 700);
-
-pub const ICONS: Font = Font::External {
-    name: "Icons",
-    bytes: include_bytes!("../assets/icons.ttf"),
+const WINDOW_SIZE: Size = Size {
+    width: 980.0,
+    height: 700.0,
 };
 
+pub const ICONS: &[u8] = include_bytes!("../assets/icons.ttf");
+pub const ICON: &[u8; 16384] = include_bytes!("../assets/icon_64.rgba8");
+
 pub fn main() -> iced::Result {
-    let settings = Settings {
-        window: window::Settings {
-            min_size: Some(WINDOW_SIZE),
-            size: WINDOW_SIZE,
-            ..window::Settings::default()
-        },
-        antialiasing: true,
-        ..Settings::default()
+    /*
+    let rgba8 = image_rs::io::Reader::open("assets/icon.png").unwrap().decode().unwrap().to_rgba8();
+    std::fs::write("assets/icon_64.rgba8", rgba8.into_raw());
+    */
+    let window_settings = window::Settings {
+        size: WINDOW_SIZE,
+        min_size: Some(WINDOW_SIZE),
+        icon: window::icon::from_rgba(ICON.to_vec(), 64, 64).ok(),
+        ..window::Settings::default()
     };
-    MainState::run(settings)
+    let run = iced::application("SlimeVR Wrangler", MainState::update, MainState::view)
+        .subscription(MainState::subscription)
+        .window(window_settings)
+        .antialiasing(true)
+        .font(ICONS)
+        .run_with(MainState::new);
+    match run {
+        Ok(a) => Ok(a),
+        Err(e) => {
+            println!("{e:?}");
+            print!("Press enter to continue...");
+            io::stdout().flush().unwrap();
+            let _ = io::stdin().read(&mut [0u8]).unwrap();
+            Err(e)
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 enum Message {
-    EventOccurred(iced_native::Event),
-    EnableJoyconsPressed,
     SettingsPressed,
     Tick(Instant),
     Dot(Instant),
@@ -58,34 +80,30 @@ enum Message {
     BlacklistFixPressed,
     JoyconRotate(String, bool),
     JoyconScale(String, f64),
+    SettingsResetToggled(bool),
+    SettingsIdsToggled(bool),
 }
 
 #[derive(Default)]
 struct MainState {
-    joycon: Option<JoyconIntegration>,
-    joycon_boxes: Vec<JoyconBox>,
-    joycon_svg: JoyconSvg,
-    num_columns: usize,
+    joycon: Option<joycon::Wrapper>,
+    joycon_boxes: JoyconBoxes,
     search_dots: usize,
     settings_show: bool,
+    server_connected: ServerStatus,
+    server_address: String,
 
     settings: settings::Handler,
     update_found: Option<String>,
     blacklist_info: blacklist::BlacklistResult,
 }
-impl Application for MainState {
-    type Executor = executor::Default;
-    type Flags = ();
-    type Message = Message;
-    type Theme = Theme;
-
-    fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
+impl MainState {
+    fn new() -> (Self, Command<Message>) {
+        let mut new = Self::default();
+        new.joycon = Some(joycon::Wrapper::new(new.settings.clone()));
+        new.server_address = format!("{}", new.settings.load().get_socket_address());
         (
-            Self {
-                num_columns: 3,
-                joycon_svg: JoyconSvg::new(),
-                ..Self::default()
-            },
+            new,
             Command::batch(vec![
                 Command::perform(update::check_updates(), Message::UpdateFound),
                 Command::perform(blacklist::check_blacklist(), Message::BlacklistChecked),
@@ -93,42 +111,18 @@ impl Application for MainState {
         )
     }
 
-    fn title(&self) -> String {
-        String::from("SlimeVR Wrangler")
-    }
-    fn theme(&self) -> Theme {
-        Theme::Dark
-    }
-
-    fn update(&mut self, message: Message) -> Command<Self::Message> {
+    fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::EnableJoyconsPressed => {
-                self.joycon = Some(JoyconIntegration::new(self.settings.clone()));
-            }
             Message::SettingsPressed => {
                 self.settings_show = !self.settings_show;
             }
-            Message::EventOccurred(iced_native::Event::Window(
-                iced_native::window::Event::Resized { width, .. },
-            )) => {
-                if width >= WINDOW_SIZE.0 {
-                    self.num_columns = ((width - 20) / (300 + 20)) as usize;
-                }
-            }
-            Message::EventOccurred(_) => {}
             Message::Tick(_time) => {
                 if let Some(ref ji) = self.joycon {
-                    if let Some(mut res) = ji.poll() {
-                        if res.len() == self.joycon_boxes.len() {
-                            for i in 0..self.joycon_boxes.len() {
-                                self.joycon_boxes[i].status = res.remove(0);
-                            }
-                        } else {
-                            self.joycon_boxes = Vec::new();
-                            for _ in 0..res.len() {
-                                self.joycon_boxes.push(JoyconBox::new(res.remove(0)));
-                            }
-                        }
+                    if let Some(res) = ji.poll_status() {
+                        self.joycon_boxes.statuses = res;
+                    }
+                    if let Some(connected) = ji.poll_server() {
+                        self.server_connected = connected;
                     }
                 }
             }
@@ -162,233 +156,316 @@ impl Application for MainState {
                 self.settings
                     .change(|ws| ws.joycon_scale_set(serial_number, scale));
             }
+            Message::SettingsResetToggled(new) => {
+                self.settings.change(|ws| ws.send_reset = new);
+            }
+            Message::SettingsIdsToggled(new) => {
+                self.settings.change(|ws| ws.keep_ids = new);
+            }
         }
         Command::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let mut subs: Vec<Subscription<Message>> = vec![
-            iced_native::subscription::events().map(Message::EventOccurred),
+        Subscription::batch(vec![
             time::every(Duration::from_millis(500)).map(Message::Dot),
-        ];
-        if self.joycon.is_some() {
-            subs.push(time::every(Duration::from_millis(50)).map(Message::Tick));
-        }
-        Subscription::batch(subs)
+            time::every(Duration::from_millis(50)).map(Message::Tick),
+        ])
     }
 
     fn view(&self) -> Element<Message> {
-        let mut main_container;
-        if self.settings_show {
-            let mut all_settings = Column::new()
-                .spacing(20)
-                .push(address(&self.settings.load().address));
-            if self.joycon.is_some() {
-                all_settings = all_settings.push(text("You need to restart this program to apply the settings as you have already initialized search for controllers."));
-            }
-            main_container = container(all_settings).padding(20);
-        } else {
-            let search_dots = ".".repeat(self.search_dots);
+        let mut app = Column::new().push(top_bar(self.update_found.clone()));
 
-            let mut boxes: Vec<Container<Message>> = Vec::new();
-
-            if self.joycon.is_some() {
-                for joycon_box in &self.joycon_boxes {
-                    let svg = self
-                        .joycon_svg
-                        .get(&joycon_box.status.design, joycon_box.status.mount_rotation);
-                    let scale = self
-                        .settings
-                        .load()
-                        .joycon_scale_get(&joycon_box.status.serial_number);
-                    boxes.push(
-                        contain(joycon_box.view(svg, scale))
-                            .style(style::item_normal as for<'r> fn(&'r _) -> _),
-                    );
-                }
-                boxes.push(
-                    contain(
-                        Column::new()
-                        .push(
-                            text(format!(
-                                "Looking for Joycon controllers{}\n\n\
-                                Please pair controllers in the bluetooth settings of Windows if they don't show up here.",
-                                search_dots
-                            ))
-                        )
-                        .align_items(Alignment::Center),
-                    ).style(style::item_special as for<'r> fn(&'r _) -> _)
-                );
-            } else {
-                let feature_enabler = Column::new()
-                    .spacing(10)
-                    .push(text("Add new trackers"))
-                    .push(
-                        button(text("Search for Joy-Con's"))
-                            .on_press(Message::EnableJoyconsPressed)
-                            .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
-                    );
-                boxes.push(
-                    contain(feature_enabler).style(style::item_special as for<'r> fn(&'r _) -> _),
-                );
-            }
-
-            let list = float_list(self.num_columns, boxes);
-
-            main_container = container(list);
-        }
-
-        main_container = main_container
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .style(style::container_darker as for<'r> fn(&'r _) -> _);
-
-        let top_bar = top_bar(self.update_found.clone());
-
-        let mut app = Column::new().push(top_bar);
         if self.blacklist_info.visible() {
             app = app.push(blacklist_bar(&self.blacklist_info));
         }
-        app.push(main_container).into()
+
+        app.push(
+            if self.settings_show {
+                container(self.settings_screen()).padding(20)
+            } else {
+                container(self.joycon_screen())
+            }
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(style::container_darker),
+        )
+        .push(bottom_bar(
+            self.server_connected,
+            &".".repeat(self.search_dots),
+            &self.server_address,
+        ))
+        .into()
+    }
+    fn joycon_screen(&self) -> Scrollable<'_, Message> {
+        let boxes = self.joycon_boxes.view(&self.settings.load());
+        let grid = boxes.into_iter().fold(Wrap::new(), |wrap, bax| {
+            wrap.push(container(bax).padding(10))
+        });
+        let list = Column::new().padding(10).width(Length::Fill).push(grid);
+
+        let list = list.push(
+            container(text(format!(
+                "Searching for Joycon controllers{}\n\
+                    Please pair controllers in the bluetooth \
+                    settings of Windows if they don't show up here.",
+                ".".repeat(self.search_dots)
+            )))
+            .padding(10),
+        );
+        scrollable(list).height(Length::Fill)
+    }
+    fn settings_screen(&self) -> Column<'_, Message> {
+        Column::new()
+            .spacing(20)
+            .push(address(&self.settings.load().address))
+            .push(checkbox(
+                "Send yaw reset command to SlimeVR Server after B or UP button press.",
+                self.settings.load().send_reset).on_toggle(
+                Message::SettingsResetToggled)
+            )
+            .push(checkbox(
+                "Save mounting location on server. Requires SlimeVR Server v0.6.1 or newer. Restart Wrangler after changing this.",
+                self.settings.load().keep_ids).on_toggle(
+                Message::SettingsIdsToggled,
+            ))
     }
 }
 
-fn contain<'a, M: 'a, T>(content: T) -> Container<'a, M>
-where
-    T: Into<Element<'a, M>>,
-{
-    container(content)
-        .height(Length::Units(280))
-        .width(Length::Units(300))
-        .padding(10)
-}
-fn float_list(columns: usize, boxes: Vec<Container<'_, Message>>) -> Scrollable<'_, Message> {
-    let mut list = Column::new().padding(20).spacing(20).width(Length::Fill);
-    for chunk in &boxes.into_iter().chunks(columns) {
-        let mut row: Row<Message> = Row::new().spacing(20);
-
-        for bax in chunk {
-            row = row.push(bax);
-        }
-        list = list.push(row);
-    }
-    scrollable(list).height(Length::Fill)
-}
 fn address<'a>(input_value: &str) -> Column<'a, Message> {
-    let address_info = text("Enter a valid ip with port number:");
-    let address = text_input("127.0.0.1:6969", input_value, Message::AddressChange)
-        .width(Length::Units(500))
+    let address = text_input("127.0.0.1:6969", input_value)
+        .on_input(Message::AddressChange)
+        .width(Length::Fixed(300.0))
         .padding(10);
 
-    let mut allc = Column::new().spacing(10).push(address_info).push(address);
+    let address_row = Row::new()
+        .spacing(10)
+        .align_y(Alignment::Center)
+        .push("SlimeVR Server address:")
+        .push(address)
+        .push("Restart Wrangler after changing this.");
+    let mut allc = Column::new().push(address_row).spacing(10);
 
-    if input_value.parse::<SocketAddr>().is_ok() {
-        allc = allc.push(vertical_space(Length::Units(20)));
-    } else {
-        allc = allc.push(text(
-            "Input not a valid ip with port number! Using default instead (127.0.0.1:6969).",
-        ));
+    if input_value.parse::<SocketAddr>().is_err() {
+        allc = allc.push(
+            container(text(
+                "Address is not a valid ip with port number! Using default instead (127.0.0.1:6969).",
+            ))
+            .style(style::text_yellow),
+        );
     }
     allc
 }
 fn top_bar<'a>(update: Option<String>) -> Container<'a, Message> {
     let mut top_column = Row::new()
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .push(text("SlimeVR Wrangler").size(24));
 
     if let Some(u) = update {
         let update_btn = button(text("Update"))
-            .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
+            .style(style::button_primary)
             .on_press(Message::UpdatePressed);
         top_column = top_column
-            .push(horizontal_space(Length::Units(20)))
-            .push(text(format!("New Update found! Version: {}. ", u)))
+            .push(Space::with_width(Length::Fixed(20.0)))
+            .push(text(format!("New update found! Version: {u}. ")))
             .push(update_btn);
     }
 
     let settings = button(text("Settings"))
-        .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
+        .style(style::button_settings)
         .on_press(Message::SettingsPressed);
-    top_column = top_column
-        .push(horizontal_space(Length::Fill))
-        .push(settings);
+    top_column = top_column.push(horizontal_space()).push(settings);
 
     container(top_column)
         .width(Length::Fill)
         .padding(20)
-        .style(style::container_highlight as for<'r> fn(&'r _) -> _)
+        .style(style::container_highlight)
 }
 
 fn blacklist_bar<'a>(result: &blacklist::BlacklistResult) -> Container<'a, Message> {
     let mut row = Row::new()
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .push(text(result.info.clone()))
-        .push(horizontal_space(Length::Units(20)));
+        .push(Space::with_width(Length::Fixed(20.0)));
     if result.fix_button {
         row = row.push(
             button(text("Fix blacklist"))
-                .style(theme::Button::Custom(Box::new(style::PrimaryButton)))
+                .style(style::button_primary)
                 .on_press(Message::BlacklistFixPressed),
         );
     }
     container(row)
         .width(Length::Fill)
         .padding(20)
-        .style(style::container_info as for<'r> fn(&'r _) -> _)
+        .style(style::container_info)
 }
 
-#[derive(Debug, Clone)]
-struct JoyconBox {
-    pub status: JoyconStatus,
+fn bottom_bar<'a>(
+    connected: ServerStatus,
+    search_dots: &String,
+    address: &String,
+) -> Container<'a, Message> {
+    let status = Row::new()
+        .push(text("Connection to SlimeVR Server: "))
+        .push(container(text(format!("{connected:?}"))).style(
+            if connected == ServerStatus::Connected {
+                style::text_green
+            } else {
+                style::text_yellow
+            },
+        ))
+        .push(text(if connected == ServerStatus::Connected {
+            format!(" to {address}.")
+        } else {
+            format!(". Trying to connect to {address}{search_dots}")
+        }));
+    container(status)
+        .width(Length::Fill)
+        .padding(20)
+        .style(style::container_info)
 }
 
-impl JoyconBox {
-    fn new(status: JoyconStatus) -> Self {
-        Self { status }
+#[derive(Debug)]
+struct JoyconBoxes {
+    pub statuses: Vec<joycon::Status>,
+    svg_handler: joycon::Svg,
+    needle_handler: Needle,
+}
+
+impl Default for JoyconBoxes {
+    fn default() -> Self {
+        Self {
+            statuses: vec![],
+            svg_handler: joycon::Svg::new(),
+            needle_handler: Needle::new(),
+        }
     }
-    fn view(&self, svg: Svg, scale: f64) -> Column<Message> {
-        let sn = self.status.serial_number.clone();
+}
 
-        let buttons = Row::new()
-            .spacing(10)
-            .push(
-                button(text("↺").font(ICONS))
-                    .on_press(Message::JoyconRotate(sn.clone(), false))
-                    .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
-            )
-            .push(
-                button(text("↻").font(ICONS))
-                    .on_press(Message::JoyconRotate(sn.clone(), true))
-                    .style(theme::Button::Custom(Box::new(style::PrimaryButton))),
-            );
-
-        let left = Column::new()
-            .spacing(10)
-            .align_items(Alignment::Center)
-            .push(buttons)
-            .push(svg)
-            .width(Length::Units(150));
-
-        let top = Row::new()
-            .spacing(10)
-            .push(left)
-            .push(text(format!(
-                "Roll: {:.0}\nPitch: {:.0}\nYaw: {:.0}",
-                self.status.rotation.0, self.status.rotation.1, self.status.rotation.2
-            )))
-            .height(Length::Units(160));
-
-        let bottom = Column::new()
-            .spacing(10)
-            .push(
-                slider(0.8..=1.2, scale, move |c| {
-                    Message::JoyconScale(sn.clone(), c)
-                })
-                .step(0.001),
-            )
-            .push(text(format!("Rotation scale ratio: {:.3}", scale)))
-            .push(text("Change this if the tracker in vr moves less or more than your irl joycon. Higher value = more movement.").size(14));
-
-        Column::new().spacing(10).push(top).push(bottom)
+impl JoyconBoxes {
+    fn view<'a>(&'a self, settings: &WranglerSettings) -> Vec<Container<'a, Message>> {
+        self.statuses
+            .iter()
+            .map(|status| {
+                container(single_box_view(
+                    status,
+                    &self.svg_handler,
+                    &self.needle_handler,
+                    settings.joycon_scale_get(&status.serial_number),
+                    settings.joycon_rotation_get(&status.serial_number),
+                ))
+                .height(Length::Fixed(335.0))
+                .width(Length::Fixed(300.0))
+                .padding(10)
+                .style(style::item_normal)
+            })
+            .collect()
     }
+}
+
+fn single_box_view<'a>(
+    status: &joycon::Status,
+    svg_handler: &joycon::Svg,
+    needle_handler: &Needle,
+    scale: f64,
+    mount_rot: i32,
+) -> Column<'a, Message> {
+    let sn = status.serial_number.clone();
+
+    let buttons = Row::new()
+        .spacing(10)
+        .push(
+            button(text("↺").font(Font::with_name("fontello")))
+                .on_press(Message::JoyconRotate(sn.clone(), false))
+                .style(style::button_primary),
+        )
+        .push(
+            button(text("↻").font(Font::with_name("fontello")))
+                .on_press(Message::JoyconRotate(sn.clone(), true))
+                .style(style::button_primary),
+        );
+
+    let svg = Svg::new(svg_handler.get(&status.design, mount_rot));
+
+    let left = Column::new()
+        .spacing(10)
+        .align_x(Alignment::Center)
+        .push(buttons)
+        .push(svg)
+        .width(Length::Fixed(130.0));
+
+    let rot = status.rotation;
+    let values = Row::with_children(
+        [("Roll", rot.0), ("Pitch", rot.1), ("Yaw", -rot.2)]
+            .iter()
+            .map(|(name, val)| {
+                let ival = (*val as i32).rem_euclid(360);
+
+                Column::new()
+                    .push(text(name.to_string()))
+                    .push(
+                        Svg::new(needle_handler.get(ival))
+                            .width(Length::Fixed(25.0))
+                            .height(Length::Fixed(25.0)),
+                    )
+                    .push(text(format!("{ival}")))
+                    .spacing(10)
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill)
+                    .into()
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    let circle = circle(
+        8.0,
+        match status.status {
+            DeviceStatus::Disconnected | DeviceStatus::NoIMU => Color::from_rgb8(0xff, 0x38, 0x4A),
+            DeviceStatus::LaggyIMU => Color::from_rgb8(0xff, 0xe3, 0x3c),
+            DeviceStatus::Healthy => Color::from_rgb8(0x3d, 0xff, 0x81),
+        },
+    );
+    let circle_cont = container(circle)
+        .width(Length::Fixed(16.0))
+        .height(Length::Fixed(16.0));
+
+    let top = Row::new()
+        .spacing(5)
+        .push(circle_cont)
+        .push(left)
+        .push(values)
+        .height(Length::Fixed(150.0));
+
+    let battery_text =
+        container(text(format!("{:?}", status.battery))).style(match status.battery {
+            Battery::Empty | Battery::Critical => style::text_orange,
+            Battery::Low => style::text_yellow,
+            Battery::Medium | Battery::Full => style::text_green,
+        });
+
+    let status_text = container(text(format!("{}", status.status))).style(match status.status {
+        DeviceStatus::Disconnected | DeviceStatus::NoIMU => style::text_orange,
+        DeviceStatus::LaggyIMU => style::text_yellow,
+        DeviceStatus::Healthy => style::text_green,
+    });
+
+    let bottom = Column::new()
+        .spacing(10)
+        .push(
+            slider(0.8..=1.2, scale, move |c| {
+                Message::JoyconScale(sn.clone(), c)
+            })
+            .step(0.001),
+        )
+        .push(text(format!("Rotation scale ratio: {scale:.3}")))
+        .push(
+            text(
+                "Change this if the tracker in vr moves less or more than your irl joycon. Higher value = more movement.",
+            )
+            .size(14),
+        )
+        .push(Row::new().push(text("Battery level: ")).push(battery_text))
+        .push(Row::new().push(text("Status: ")).push(status_text));
+
+    Column::new().spacing(10).push(top).push(bottom)
 }
