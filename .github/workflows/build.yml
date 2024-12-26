@@ -4,23 +4,39 @@ on:
     branches:
       - actions-test
 jobs:
-  build_windows:
-    runs-on: windows-latest
+  build_macos:
+    runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Enable static CRT linkage
-      run: |
-        mkdir .cargo
-        echo '[target.x86_64-pc-windows-msvc]' >> .cargo/config
-        echo 'rustflags = ["-Ctarget-feature=+crt-static"]' >> .cargo/config
     - name: Cache cargo dependencies
       uses: Swatinem/rust-cache@v2
       with:
         shared-key: "wrangler"
-    - name: Build windows binary
+    - name: Build mac binary
       run: cargo build --verbose --release
-    - name: Archive windows binary
+    - name: Open binary via double-click
+      run: chmod +x target/release/slimevr-wrangler
+    - name: Archive mac binary
       uses: actions/upload-artifact@v4
       with:
-        name: slimevr-wrangler.exe 
-        path: target/release/slimevr-wrangler.exe 
+        name: slimevr-wrangler-macos
+        path: target/release/slimevr-wrangler
+  build_macos_old:
+    runs-on: macos-13
+    steps:
+    - uses: actions/checkout@v3
+    - name: Cache cargo dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "wrangler"
+    - name: Build mac binary old
+      env:
+        MACOSX_DEPLOYMENT_TARGET: 10.14
+      run: cargo build --verbose --release
+    - name: Open binary via double-click
+      run: chmod +x target/release/slimevr-wrangler
+    - name: Archive mac binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: slimevr-wrangler-macos-old
+        path: target/release/slimevr-wrangler
