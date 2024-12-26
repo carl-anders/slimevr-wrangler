@@ -21,7 +21,7 @@ jobs:
     - name: Build windows binary
       run: cargo build --verbose --release
     - name: Archive windows binary
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
         name: slimevr-wrangler.exe 
         path: target/release/slimevr-wrangler.exe 
@@ -35,15 +35,33 @@ jobs:
       with:
         shared-key: "wrangler"
     - name: Build mac binary
+      run: cargo build --verbose --release
+    - name: Open binary via double-click
+      run: chmod +x target/release/slimevr-wrangler
+    - name: Archive mac binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: slimevr-wrangler-macos
+        path: target/release/slimevr-wrangler
+
+  build_macos_old:
+    runs-on: macos-13
+    steps:
+    - uses: actions/checkout@v3
+    - name: Cache cargo dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "wrangler-old"
+    - name: Build mac binary old
       env:
         MACOSX_DEPLOYMENT_TARGET: 10.14
       run: cargo build --verbose --release
     - name: Open binary via double-click
       run: chmod +x target/release/slimevr-wrangler
     - name: Archive mac binary
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
-        name: slimevr-wrangler-macos
+        name: slimevr-wrangler-macos-old
         path: target/release/slimevr-wrangler
 
   build_ubuntu:
@@ -64,7 +82,7 @@ jobs:
     - name: Open binary via double-click
       run: chmod +x target/release/slimevr-wrangler
     - name: Archive ubuntu binary
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
         name: slimevr-wrangler-ubuntu
         path: target/release/slimevr-wrangler
