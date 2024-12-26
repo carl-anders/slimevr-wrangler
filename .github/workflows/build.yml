@@ -18,7 +18,7 @@ jobs:
     - name: Open binary via double-click
       run: chmod +x target/release/slimevr-wrangler
     - name: Archive ubuntu binary
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
         name: slimevr-wrangler
         path: target/release/slimevr-wrangler
