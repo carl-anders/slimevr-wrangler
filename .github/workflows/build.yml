@@ -4,21 +4,23 @@ on:
     branches:
       - actions-test
 jobs:
-  build_ubuntu:
-    runs-on: ubuntu-latest
+  build_windows:
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Install dependencies
+    - name: Enable static CRT linkage
       run: |
-        export DEBIAN_FRONTED=noninteractive
-        sudo apt-get -qq update
-        sudo apt-get install -y libxkbcommon-dev libudev-dev build-essential linux-tools-common pkg-config libssl-dev libusb-1.0-0-dev clang
-    - name: Build ubuntu binary
+        mkdir .cargo
+        echo '[target.x86_64-pc-windows-msvc]' >> .cargo/config
+        echo 'rustflags = ["-Ctarget-feature=+crt-static"]' >> .cargo/config
+    - name: Cache cargo dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: "wrangler"
+    - name: Build windows binary
       run: cargo build --verbose --release
-    - name: Open binary via double-click
-      run: chmod +x target/release/slimevr-wrangler
-    - name: Archive ubuntu binary
+    - name: Archive windows binary
       uses: actions/upload-artifact@v4
       with:
-        name: slimevr-wrangler
-        path: target/release/slimevr-wrangler
+        name: slimevr-wrangler.exe 
+        path: target/release/slimevr-wrangler.exe 
