@@ -4,39 +4,25 @@ on:
     branches:
       - actions-test
 jobs:
-  build_macos:
-    runs-on: macOS-latest
+  build_ubuntu:
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        export DEBIAN_FRONTED=noninteractive
+        sudo apt-get -qq update
+        sudo apt-get install -y libxkbcommon-dev libudev-dev build-essential linux-tools-common pkg-config libssl-dev libusb-1.0-0-dev clang
     - name: Cache cargo dependencies
       uses: Swatinem/rust-cache@v2
       with:
         shared-key: "wrangler"
-    - name: Build mac binary
+    - name: Build ubuntu binary
       run: cargo build --verbose --release
     - name: Open binary via double-click
       run: chmod +x target/release/slimevr-wrangler
-    - name: Archive mac binary
+    - name: Archive ubuntu binary
       uses: actions/upload-artifact@v4
       with:
-        name: slimevr-wrangler-macos
-        path: target/release/slimevr-wrangler
-  build_macos_old:
-    runs-on: macos-13
-    steps:
-    - uses: actions/checkout@v3
-    - name: Cache cargo dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        shared-key: "wrangler"
-    - name: Build mac binary old
-      env:
-        MACOSX_DEPLOYMENT_TARGET: 10.14
-      run: cargo build --verbose --release
-    - name: Open binary via double-click
-      run: chmod +x target/release/slimevr-wrangler
-    - name: Archive mac binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: slimevr-wrangler-macos-old
+        name: slimevr-wrangler-ubuntu
         path: target/release/slimevr-wrangler
