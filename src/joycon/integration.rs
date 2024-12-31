@@ -2,6 +2,7 @@ use super::communication::ChannelData;
 use super::imu::{JoyconAxisData, JoyconQuatData};
 use super::{Battery, ChannelInfo, JoyconDesign, JoyconDesignType};
 use crate::settings;
+use joycon_quat::types::Timestamp;
 use joycon_rs::joycon::device::calibration::imu::IMUCalibration;
 use joycon_rs::joycon::lights::{LightUp, Lights};
 use joycon_rs::prelude::input_report_mode::{BatteryLevel, StandardInputReport};
@@ -55,6 +56,7 @@ impl From<[u8; 12]> for AxisData {
 #[derive(Debug, Clone)]
 struct IMUData {
     pub data: [(Accel, joycon_quat::Quaternion); 3],
+    pub ts: Timestamp,
 }
 
 impl TryFrom<[u8; 349]> for IMUData {
@@ -74,7 +76,7 @@ impl TryFrom<[u8; 349]> for IMUData {
             //concat.chunks_exact_mut(2).for_each(|c| c.swap(0, 1));
             concat
         };
-        let ([quat_latest, quat_5ms, quat_10ms], _ts) = joycon_quat::Quaternion::parse(rotation_data).unwrap(); // TODO: throw error
+        let ([quat_latest, quat_5ms, quat_10ms], ts) = joycon_quat::Quaternion::parse(rotation_data).unwrap(); // TODO: throw error
 
         let data = [
             (latest.accel, quat_latest),
@@ -82,7 +84,7 @@ impl TryFrom<[u8; 349]> for IMUData {
             (a_10ms_older.accel, quat_10ms),
         ];
 
-        Ok(IMUData { data })
+        Ok(IMUData { data, ts })
     }
 }
 
@@ -108,7 +110,7 @@ impl<D: JoyConDriver> InputReportMode<D> for QuatFullMode<D> {
 
         driver.send_sub_command(SubCommand::EnableIMU, &[0x02u8])?;
 
-        driver.set_valid_reply(false);
+        //driver.set_valid_reply(false);
 
         driver.send_sub_command(Self::SUB_COMMAND, Self::ARGS.as_ref())?;
 
@@ -196,9 +198,14 @@ fn joycon_listen_loop(
         JoyConDeviceType::JoyConL | JoyConDeviceType::ProCon => |v| v,
     };
     let mut last_battery = None;
+    //let mut last_quat: Option<()>
+    let mut last_now = std::time::Instant::now();
     loop {
         match standard.read_input_report() {
             Ok(report) => {
+                let now = std::time::Instant::now();
+
+                last_now = now;
                 if report.common.input_report_id == 48 {
                     if Some(report.common.battery.level) != last_battery {
                         last_battery = Some(report.common.battery.level);
@@ -235,7 +242,7 @@ fn joycon_listen_loop(
                     // ))
                     // .unwrap();
 
-                    tx.send(ChannelData::new(serial_number.clone(), ChannelInfo::QuatData(imu_data))).unwrap()
+                    tx.send(ChannelData::new(serial_number.clone(), ChannelInfo::QuatData(imu_data, report.extra.ts))).unwrap()
                 }
             }
             Err(JoyConError::Disconnected) => {

@@ -7,6 +7,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use joycon_quat::types::Timestamp;
 use nalgebra::{UnitQuaternion, Vector3};
 use protocol::deku::{DekuContainerRead, DekuContainerWrite};
 use protocol::PacketType;
@@ -95,7 +96,7 @@ impl ChannelData {
 pub enum ChannelInfo {
     Connected(JoyconDesign),
     ImuData([JoyconAxisData; 3]),
-    QuatData([JoyconQuatData; 3]),
+    QuatData([JoyconQuatData; 3], Timestamp),
     Battery(Battery),
     Reset,
     Disconnected,
@@ -285,17 +286,17 @@ impl Communication {
                         .unwrap();
                 }
             }
-            ChannelInfo::QuatData(imu_data) => {
+            ChannelInfo::QuatData(imu_data, ts) => {
                 if let Some(device) = self.devices.get_mut(&sn) {
-                    device.imu.rotation = imu_data[0].quat;
+                    device.imu.update_quat(imu_data, ts);
                     device.imu_times.push(Instant::now());
                     let joycon_rotation = self.settings.load().joycon_rotation_get(&sn);
                     let rad_rotation = (joycon_rotation as f64).to_radians();
                     let rotated_quat = if joycon_rotation > 0 {
-                        imu_data[0].quat
+                        device.imu.rotation
                             * UnitQuaternion::from_axis_angle(&Vector3::z_axis(), rad_rotation)
                     } else {
-                        imu_data[0].quat
+                        device.imu.rotation
                     };
 
                     let rotation_packet = PacketType::RotationData {
