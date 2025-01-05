@@ -63,7 +63,15 @@ impl Imu {
             //     current.inverse_mut();
             // }
 
-            let gyro = current.scaled_axis() / Self::SAMPLE_SEC;
+            let mut gyro = current.scaled_axis() / Self::SAMPLE_SEC;
+
+            // The axis don't appear to be exactly the same, for some reason: let's correct for that.
+            let tmp_x = -gyro.z;
+
+            gyro.z = -gyro.x;
+            gyro.x = tmp_x;
+
+            //println!("gyro: {:?}", gyro);
 
             let acc = Vector3::new(frame.accel_x, frame.accel_y, frame.accel_z);
 
