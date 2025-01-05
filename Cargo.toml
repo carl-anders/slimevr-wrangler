@@ -28,12 +28,14 @@ protocol = { path = "protocol", features = ["nalgebra032"] }
 itertools = "0.13"
 nalgebra = { version = "0.32", features = ["convert-mint"] }
 arc-swap = "1.7"
-vqf-cxx = { git = "https://github.com/kitlith/vqf-cxx", rev = "d1b94272cd2f73ea2baede3b785d3818f7411fc2" }
+vqf-rs = "0.2.0"
 keyvalues-parser = "0.1.0"
 regex = "1.11"
 thiserror = "2.0"
 spin_sleep = "1.3"
 rand = "0.8"
+joycon-quat = { git = "https://github.com/kitlith/joycon-quat", rev = "1af25e948e10116228b25e620fdfb61f48b1a7d6" }
+static-slicing = "0.2.0"
 
 [target.'cfg(target_os="windows")'.dependencies]
 winreg = "0.11"
