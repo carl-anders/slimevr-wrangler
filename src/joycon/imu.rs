@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use joycon_quat::types::Timestamp;
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
-use vqf_cxx::{VQFBuilder, VQF};
+use vqf_rs::{VQF, Params};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JoyconAxisData {
@@ -31,8 +31,14 @@ impl Imu {
     const SAMPLE_SEC: f64 = Duration::from_millis(5).as_secs_f64();
 
     pub fn new() -> Self {
+        let params = Params {
+            // temporary, until bias clip is made relative to pre-existing bias.
+            bias_clip: 5.0,
+            ..Default::default()
+        };
+
         Self {
-            vqf: VQFBuilder::new(Self::SAMPLE_SEC).build(),
+            vqf: VQF::new(Self::SAMPLE_SEC, None, None, Some(params)),
             rotation: UnitQuaternion::identity(),
             last_raw: UnitQuaternion::identity(),
         }
@@ -40,8 +46,12 @@ impl Imu {
     pub fn update(&mut self, frame: JoyconAxisData) {
         let gyro = Vector3::new(frame.gyro_x, frame.gyro_y, frame.gyro_z);
         let acc = Vector3::new(frame.accel_x, frame.accel_y, frame.accel_z);
-        self.vqf.update_6dof(&gyro.data.0[0], &acc.data.0[0]);
-        self.rotation = UnitQuaternion::new_unchecked(self.vqf.get_quat_6d().into());
+
+        self.vqf.update_gyr(gyro.data.0[0]);
+        self.vqf.update_acc(acc.data.0[0]);
+
+        let quat = self.vqf.quat_6d();
+        self.rotation = UnitQuaternion::new_unchecked(Quaternion::new(quat.0, quat.1, quat.2, quat.3));
     }
 
     pub fn update_quat(&mut self, quats: [JoyconQuatData; 3], ts: Timestamp) {
@@ -56,12 +66,7 @@ impl Imu {
 
             // The conjugation status of the quaternion is effectively random due to the use of quatcompress,
             // so let's compute both and find the lowest angle.
-            let mut current = std::cmp::min_by(a, b, |a, b| a.angle().total_cmp(&b.angle()));
-
-            // is this necessary???
-            // if current.w < 0.0 {
-            //     current.inverse_mut();
-            // }
+            let current = std::cmp::min_by(a, b, |a, b| a.angle().total_cmp(&b.angle()));
 
             let mut gyro = current.scaled_axis() / Self::SAMPLE_SEC;
 
@@ -71,15 +76,16 @@ impl Imu {
             gyro.z = -gyro.x;
             gyro.x = tmp_x;
 
-            //println!("gyro: {:?}", gyro);
-
             let acc = Vector3::new(frame.accel_x, frame.accel_y, frame.accel_z);
 
             for _ in 0..repeat_count {
-                self.vqf.update_6dof(&gyro.data.0[0], &acc.data.0[0]);
+                self.vqf.update_gyr(gyro.data.0[0]);
+                self.vqf.update_acc(acc.data.0[0]);
             }
         }
-        self.rotation = UnitQuaternion::new_unchecked(self.vqf.get_quat_6d().into());
+        let quat = self.vqf.quat_6d();
+
+        self.rotation = UnitQuaternion::new_unchecked(Quaternion::new(quat.0, quat.1, quat.2, quat.3));
     }
     // euler_angles: roll, pitch, yaw
     pub fn euler_angles_deg(&self) -> (f64, f64, f64) {
