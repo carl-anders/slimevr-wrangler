@@ -53,8 +53,8 @@ fn return_false() -> bool {
     false
 }
 fn return_mac() -> [u8; 6] {
-    let mut r = rand::thread_rng();
-    [0x00, 0x0F, r.gen(), r.gen(), r.gen(), r.gen()]
+    let mut r = rand::rng();
+    [0x00, 0x0F, r.random(), r.random(), r.random(), r.random()]
 }
 
 const DEFAULT_ADDR: &str = "127.0.0.1:6969";
